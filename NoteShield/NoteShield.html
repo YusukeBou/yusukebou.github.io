@@ -672,6 +672,12 @@ const viewModel = (function() {
 
     this.onLanguageSelectorInput = function() {
       const elements = getPageElements();
+
+      elements.plain.value = "";
+      elements.encoded.value = "";
+      elements.decoded.value = "";
+      elements.phraseInput.value = "";
+
       window.location.replace(`?l=${elements.languageSelector.value}`);
     };
 
