@@ -52,7 +52,7 @@ const appFiles = [
 self.addEventListener("install", function(event) {
   event.waitUntil((async function(){
     const jsonCache = await self.caches.open(jsonCacheName);
-    await jsonCache.add(jsonCache);
+    await jsonCache.add(jsonFile);
     const cacheName = await getCacheNameAsync();
     const cache = await self.caches.open(cacheName);
     await cache.addAll(appFiles);
