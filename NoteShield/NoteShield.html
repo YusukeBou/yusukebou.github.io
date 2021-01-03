@@ -27,6 +27,7 @@
 <link rel="apple-touch-icon" href="NoteShield.120x120.png" sizes="120x120">
 <link rel="apple-touch-icon" href="NoteShield.180x180.png" sizes="180x180">
 
+<!-- In case of local-copy (file:// protocol) scenario, the below may fail. -->
 <link rel="manifest" href="NoteShield.webmanifest">
 
 <script type="text/javascript">
@@ -960,7 +961,7 @@ const resources = {
 // Supporting language regions may need code changes as well.
 
 // Progressive web app service worker registration. For now, always try to update.
-if (navigator.serviceWorker) {
+if (navigator.serviceWorker && window.location.protocol.toLowerCase().startsWith("https:")) {
   (async function(){
     const serviceWorkerRegistration = await navigator.serviceWorker.register("NoteShield.ServiceWorker.js");
     serviceWorkerRegistration.update();
@@ -973,6 +974,9 @@ if (navigator.serviceWorker) {
   body, select, input[type="password"], textarea, button {
     color: white;
     background-color: black;
+  }
+  a {
+    color:deepskyblue;
   }
 }
 
