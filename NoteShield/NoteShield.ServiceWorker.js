@@ -1,7 +1,6 @@
 const cacheName = 'NoteShieldV1'; // Not pushing the updates but the user may actively fetch the update.
 
 const appFiles = [
-  "/NoteShield/",
   "/NoteShield/NoteShield.html",
   "/NoteShield/NoteShield.64x64.png",
 ];

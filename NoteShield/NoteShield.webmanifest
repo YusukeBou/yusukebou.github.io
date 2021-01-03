@@ -7,7 +7,7 @@
       "src": "NoteShield.64x64.png",
       "sizes": "64x64",
       "type": "image/png"
-    },
+    }
   ],
   "start_url": "NoteShield.html",
   "display": "fullscreen",
