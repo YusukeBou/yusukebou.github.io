@@ -1,0 +1,16 @@
+{
+  "name": "Note Shield",
+  "short_name": "Note Shield",
+  "description": "This page can shield your note with an encryption pass-phrase or recover it from the shielded text. The note cannot be recovered without your pass-phrase. The page does not send any information about your pass-phrase or note to outside your device.",
+  "icons": [
+    {
+      "src": "NoteShield.64x64.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
+  ],
+  "start_url": "NoteShield.html",
+  "display": "fullscreen",
+  "theme_color": "#808080",
+  "background_color": "#808080"
+}
