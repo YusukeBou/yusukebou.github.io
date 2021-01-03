@@ -952,6 +952,11 @@ const resources = {
 // Spanish, French, Chinese (Simplified, Traditional), German, Portguese (pt-BR), and Russian would give a good coverage.
 // Arabic or Hebrew may need Right-to-Left support with "DIR" attribute in BODY element.
 // Supporting language regions may need code changes as well.
+
+// Progressive web app service worker registration.
+if (navigator.serviceWorker) {
+  navigator.serviceWorker.register('NoteShield.ServiceWorker.js');
+}
 </script>
 <!-- TODO: need a designer for the UI design polish... -->
 <style type="text/css">
