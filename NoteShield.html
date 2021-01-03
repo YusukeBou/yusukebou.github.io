@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+<!--
+  Read the page with the browser for usage and license. Comments here include the technical descriptions.
+  The HTML file is designed to depend on nothing other than the browser itself. Do not refer to any other files, like the open-source libraries on CDN.
+-->
+
+<!-- Resource strings are applied dynamically and so the static analysis tools like the web crawlers may not find them. Hard-coding English for them. Service-side code or separate HTML files are necessary to fix that, unfortunately. -->
+
+<title data-resource-id="title" data-resource-target="innerText">Note Shield</title>
+<meta property="og:title" content="Note Shield" data-resource-id="title" data-resource-target="content">
+
+<meta name="description" data-resource-id="description" data-resource-target="content" content="This page can shield your note with an encryption pass-phrase or recover it from the shielded text. The note cannot be recovered without your pass-phrase. The page does not send any information about your pass-phrase or note to outside your device." ></<meta>
+<meta name="og:description" data-resource-id="description" data-resource-target="content" content="This page can shield your note with an encryption pass-phrase or recover it from the shielded text. The note cannot be recovered without your pass-phrase. The page does not send any information about your pass-phrase or note to outside your device." ></<meta>
+
+<!-- Prevent zooming for now -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+<link rel="shortcut icon" href="NoteShield.64x64.png" type="image/png">
+<link rel="icon" href="NoteShield.64x64.png" sizes="64x64">
+<link rel="icon" href="NoteShield.120x120.png" sizes="120x120">
+<link rel="icon" href="NoteShield.180x180.png" sizes="180x180">
+<link rel="apple-touch-icon" href="NoteShield.64x64.png" sizes="64x64">
+<link rel="apple-touch-icon" href="NoteShield.120x120.png" sizes="120x120">
+<link rel="apple-touch-icon" href="NoteShield.180x180.png" sizes="180x180">
+
+<!-- In case of local-copy (file:// protocol) scenario, the below may fail. -->
+<link rel="manifest" href="NoteShield.webmanifest">
+
+<script type="text/javascript">
+"use strict";
+
+// Refer to testCryptoLogic() for the specs of this object.
+function cryptoLogic(subtleCryptoMock) {
+  const subtleCrypto = subtleCryptoMock || cryptoLogic.getSubtleCrypto();
+  const getRandomValues = cryptoLogic.getRandomValuesFunction();
+  const textEncoder = new TextEncoder();
+  const textDecoder = new TextDecoder();
+
+  // Salt is just salt, could be hard-coded; still randomizing to embed the salt into the encoded data.
+  const saltLength = 16;
+  function generateSalt() {
+    const buffer = new Uint8Array(saltLength);
+    return getRandomValues(buffer);
+  }
+
+  // Initialization vector is the randomizer seed; cannot be hard-coded.
+  const initializationVectorLength = 12;
+  function generateInitializationVector() {
+    const buffer = new Uint8Array(initializationVectorLength);
+    return getRandomValues(buffer);
+  }
+
+  // Spec: decodeWithWrongPhrase
+  const authenticationDataLength = 16;
+
+  this.generateCryptoKey = async function(phrase, saltOrUndefined) {
+    const salt = saltOrUndefined || generateSalt();
+    const algorithm = {
+      name: "PBKDF2",
+      salt,
+      iterations: 100000,
+      hash: "SHA-256",
+    };
+    const derivedKeyAlgorithm = {
+      name: "AES-GCM",
+      length: 256,
+    };
+
+    const importedKey = await subtleCrypto.importKey("raw", textEncoder.encode(phrase), "PBKDF2", /* extractable */ false, ["deriveBits", "deriveKey"]);
+    const derivedBits = await subtleCrypto.deriveBits(algorithm, importedKey, authenticationDataLength * 8 /* bits */);
+    const derivedKey = await subtleCrypto.deriveKey(algorithm , importedKey, derivedKeyAlgorithm, /* extractable */ false, ["encrypt", "decrypt"]);
+
+    return { phrase, salt, importedKey, derivedBits, derivedKey };
+  }
+
+  function getCryptoAlgorithm(initializationVector, authenticationData) {
+    return ({
+      name: "AES-GCM",
+      iv: initializationVector,
+      additionalData: authenticationData,
+      tagLength: 128,
+    });
+  }
+
+  this.encode = async function(phrase, plainText) {
+    const key = await this.generateCryptoKey(phrase);
+    const initializationVector = generateInitializationVector();
+    const algorithm = getCryptoAlgorithm(initializationVector, key.derivedBits);
+    const encodedArrayBuffer = await subtleCrypto.encrypt(algorithm, key.derivedKey, textEncoder.encode(plainText));
+    const encoded = new Uint8Array(encodedArrayBuffer);
+
+    // Result format: Salt, initialization vector, then encoded bytes
+
+    if (key.salt.length !== saltLength) {
+      throw Error(`Unexpected salt length ${key.salt.length}`);
+    }
+    if (initializationVector.length !== initializationVectorLength) {
+      throw Error(`Unexpected initialization vector length ${initializationVector.length}`);
+    }
+
+    const result = new Uint8Array(saltLength + initializationVectorLength + encoded.length);
+    result.set(key.salt, 0);
+    result.set(initializationVector, saltLength);
+    result.set(encoded, saltLength + initializationVectorLength);
+    const resultBase64 = btoa(String.fromCharCode(...result));
+
+    const decodeBackResult = await this.decode(phrase, resultBase64);
+    if (decodeBackResult !== plainText) {
+      throw new Error("Found a bug; cannot decode the result.");
+    }
+
+    return resultBase64;
+  };
+
+  this.decode = async function(phrase, encodedText) {
+    const encodedBinary = atob(encodedText);
+    const encodedArray = Uint8Array.from(encodedBinary, (character) => character.charCodeAt(0));
+    const salt = encodedArray.subarray(0, saltLength);
+    const initializationVector = encodedArray.subarray(saltLength, saltLength + initializationVectorLength);
+    const encoded = encodedArray.subarray(saltLength + initializationVectorLength);
+
+    const key = await this.generateCryptoKey(phrase, salt);
+    const algorithm = getCryptoAlgorithm(initializationVector, key.derivedBits);
+    const result = await subtleCrypto.decrypt(algorithm, key.derivedKey, encoded);
+    return textDecoder.decode(result);
+  };
+
+  function getArrayOfIndex(length) {
+    let result = new Array(length);
+    for (let index = 0; index < length; index++) {
+      result[index] = index;
+    }
+    return result;
+  }
+
+  const charCategory = {
+    space: 0,
+    number: 1,
+    upper: 2,
+    lower: 3,
+    symbol: 4, // or, anything else
+    count: 5
+  };
+  const charCategoryCharRange = [
+    { min: " ".charCodeAt(0), max: " ".charCodeAt(0) }, // charCategory.space
+    { min: "0".charCodeAt(0), max: "9".charCodeAt(0) }, // charCategory.number
+    { min: "A".charCodeAt(0), max: "Z".charCodeAt(0) }, // charCategory.upper
+    { min: "a".charCodeAt(0), max: "z".charCodeAt(0) }, // charCategory.lower
+  ];
+  function getCharCategory(code) {
+    for (let category = 0; category < charCategoryCharRange.length; category++) {
+      const range = charCategoryCharRange[category];
+      if (code >= range.min && code <= range.max) {
+        return category;
+      }
+    }
+    return charCategory.symbol;
+  }
+  function getCharCatetories(phrase) {
+    const result = [];
+    for (let index = 0; index < phrase.length; index++) {
+      result[index] = getCharCategory(phrase.charCodeAt(index));
+    }
+    return result;
+  }
+
+  let charCountOfSymbolCategory = null;
+  function getCharCountOfCategory(category) {
+    if (category < charCategoryCharRange.length) {
+      const range = charCategoryCharRange[category];
+      return range.max - range.min + 1;
+    }
+
+    // else: symbol
+    if (!charCountOfSymbolCategory) {
+      charCountOfSymbolCategory = 128 // total ASCII characters
+        - 32 - 1 // non-printable, 0 -- 31 and 127
+        - getCharCountOfCategory(charCategory.space)
+        - getCharCountOfCategory(charCategory.number)
+        - getCharCountOfCategory(charCategory.upper)
+        - getCharCountOfCategory(charCategory.lower);
+    }
+    return charCountOfSymbolCategory;
+  }
+  this.estimatePhraseStrengthBitLength = function(phrase) {
+    const categories = getCharCatetories(phrase);
+    let isCategoryUsed = getArrayOfIndex(charCategory.count).map((category) => categories.some((foundCategory) => (category === foundCategory)));
+    const charCountOfUsedCategories = isCategoryUsed.reduce((accumulated, isUsed, category) => (accumulated + (isUsed ? getCharCountOfCategory(category) : 0)));
+    const singleCharBitLength = Math.max(Math.log2(charCountOfUsedCategories), 0);
+    return phrase.length * singleCharBitLength;
+  };
+  const maxSingleCharBitLengh = Math.log2(
+    getArrayOfIndex(charCategory.count).map((category) => getCharCountOfCategory(category)) // Array of character count for each category
+    .reduce((accumulated, charCount) => accumulated + charCount)); // Add up the character count
+
+  this.phraseStrengthCategory = {
+    none: 0,
+    weak: 1,
+    moderate: 2,
+    strong: 3,
+  };
+  const phraseStrengthCategoryBitLengthMaxMap = [
+    0, // phraseStrengthCategory.none, zero length
+    maxSingleCharBitLengh * 7, // phraseStrengthCategory.weak, 7 characters or less
+    64, // phraseStrengthCategory. // phraseStrengthCategory.moderate, 64-bit worth of complexity
+  ];
+  this.estimatePhraseStrengthCategory = function(phrase) {
+    const bitLength = this.estimatePhraseStrengthBitLength(phrase);
+    for (let category = 0; category < phraseStrengthCategoryBitLengthMaxMap.length; category++) {
+      if (bitLength <= phraseStrengthCategoryBitLengthMaxMap[category]) {
+        return category;
+      }
+    }
+    return this.phraseStrengthCategory.strong;
+  };
+}
+cryptoLogic.setErrorMessages = function(messages) {
+  cryptoLogic.errorMessages = messages;
+}
+cryptoLogic.getSubtleCrypto = function() {
+  const result = window.crypto.subtle;
+  if (!result) {
+    const message = (cryptoLogic.errorMessages && cryptoLogic.errorMessages.subtleNotFound) ? cryptoLogic.errorMessages.subtleNotFound : "window.crypto.subtle not found";
+    throw new Error(message);
+  }
+  return result;
+}
+cryptoLogic.getRandomValuesFunction = function() {
+  const result = window.crypto.getRandomValues;
+  if (!result) {
+    const message = (cryptoLogic.errorMessages && cryptoLogic.errorMessages.getRandomValuesNotFound) ? cryptoLogic.errorMessages.getRandomValuesNotFound : "window.crypto.getRandomValues not found";
+    throw new Error(message);
+  }
+  return result.bind(window.crypto);
+}
+
+async function testCryptoLogic(fromUI) {
+  const logElement = fromUI ? document.getElementById("log") : null;
+  if (logElement) {
+    logElement.innerHTML = "";
+  }
+
+  function logMessage(message, isError) {
+    if (logElement) {
+      const messageElement = document.createElement("p");
+      messageElement.innerText = message.toString();
+      if (isError) {
+        messageElement.style.setProperty("font-weight", "bold");
+        messageElement.style.setProperty("color", "red");
+      }
+      logElement.appendChild(messageElement);
+    }
+    if (isError) {
+      console.error(message);
+    } else {
+      window.console.log(message);
+    }
+  }
+
+  function beforeEach() {
+    function subtleCryptoLogger() {
+      this.subtleCrypto = cryptoLogic.getSubtleCrypto();
+      this.log = {};
+
+      this.importKey = function() {
+        const result = this.subtleCrypto.importKey(...arguments);
+        this.log.importKey = [...(this.log.importKey || []), { arguments, result }];
+        return result;
+      };
+
+      this.deriveBits = function() {
+        const result = this.subtleCrypto.deriveBits(...arguments);
+        this.log.deriveBits = [...(this.log.deriveBits || []), { arguments, result }];
+        return result;
+      };
+
+      this.deriveKey = function() {
+        const result = this.subtleCrypto.deriveKey(...arguments);
+        this.log.deriveKey = [...(this.log.deriveKey || []), { arguments, result }];
+        return result;
+      };
+
+      this.encrypt = function() {
+        const result = this.subtleCrypto.encrypt(...arguments);
+        this.log.encrypt = [...(this.log.encrypt || []), { arguments, result }];
+        return result;
+      };
+
+      this.decrypt = function() {
+        const result = this.subtleCrypto.decrypt(...arguments);
+        this.log.decrypt = [...(this.log.decrypt || []), { arguments, result }];
+        return result;
+      };
+
+      // TODO: if more methods need logging, consider a generalized logger object.
+    }
+    this.subtleCryptoLogger = new subtleCryptoLogger();
+    this.target = new cryptoLogic(this.subtleCryptoLogger);
+  }
+
+  let currentSpecName = "";
+  let specCount = 0;
+  async function spec(name, definition) {
+    currentSpecName = name;
+    logMessage(`Testing spec ${name}`);
+    specCount++;
+    try {
+      await definition(new beforeEach());
+    } catch (error) {
+      logMessage(error, true);
+    }
+  }
+
+  let successCount = 0;
+  let failureCount = 0;
+  function subSpec(condition, message) {
+    if (condition) {
+      successCount++;
+    } else {
+      failureCount++;
+      throw new Error(`Sub spec failure: ${currentSpecName}.${message}`);
+    }
+  }
+
+  async function getErrorFromFunction(asyncLambda) {
+    let caughtError = null;
+    try {
+      await asyncLambda();
+    } catch (error) {
+      caughtError = error;
+    }
+    return caughtError;
+  }
+
+  await spec("beforeEach", async function(beforeEach) {
+    subSpec(!!beforeEach.subtleCryptoLogger, "subtleCryptoLogger");
+    subSpec(!!beforeEach.target, "target");
+  });
+
+  await spec("generateSalt", async function(beforeEach){
+    const phrase = "testPhrase😎";
+    const key = await beforeEach.target.generateCryptoKey(phrase);
+    subSpec(key.salt instanceof Uint8Array, "saltIsAnInstanceOfUint8Array");
+    subSpec(key.salt.byteLength >= 16, "saltIsAtLeast16Bytes");
+  });
+
+  await spec("generateCryptoKeyByImportingPBKDF2", async function(beforeEach) {
+    const phrase = "testPhrase😀";
+    const saltArray = [197, 10, 102, 7, 212, 38, 199, 41, 5, 219, 133, 188, 185, 33, 233, 66];
+    const salt = new Uint8Array(saltArray);
+
+    const key = await beforeEach.target.generateCryptoKey(phrase, salt);
+
+    subSpec(key.phrase === phrase, "passedPhraseRemains");
+    subSpec(key.salt.length === saltArray.length && key.salt.every((value, index) => (value === saltArray[index])), "passedSaltRemains");
+
+    subSpec(key.importedKey instanceof CryptoKey, "generatesCryptoKeyByImport");
+    subSpec(beforeEach.subtleCryptoLogger.log.importKey.length === 1, "useImportKeyOnce");
+    subSpec(beforeEach.subtleCryptoLogger.log.importKey[0].arguments[0] === "raw", "importKeyUsesRawFormat");
+    subSpec(beforeEach.subtleCryptoLogger.log.importKey[0].arguments[2] === "PBKDF2", "importKeyUsesPBKDF2");
+    const decoder = new TextDecoder();
+    subSpec(decoder.decode(beforeEach.subtleCryptoLogger.log.importKey[0].arguments[1]) === phrase, "importKeyUsesUtf8TextEncoder");
+  });
+
+  await spec("generateCryptoKeyDerivedBits", async function(beforeEach) {
+    const phrase = "testPhrase😀";
+    const saltArray = [197, 10, 102, 7, 212, 38, 199, 41, 5, 219, 133, 188, 185, 33, 233, 66];
+    const salt = new Uint8Array(saltArray);
+
+    const key = await beforeEach.target.generateCryptoKey(phrase, salt);
+
+    subSpec(beforeEach.subtleCryptoLogger.log.deriveBits.length === 1, "useDeriveBitsOnce");
+    subSpec(beforeEach.subtleCryptoLogger.log.deriveBits[0].arguments[0].name === "PBKDF2", "usesPBKDF2");
+    subSpec(beforeEach.subtleCryptoLogger.log.deriveBits[0].arguments[0].hash === "SHA-256", "hashIsSHA-256");
+    subSpec(beforeEach.subtleCryptoLogger.log.deriveBits[0].arguments[0].iterations >= 100000, "iterationAtLeastOneHundredThousand");
+
+    const expectedBits = [217, 47, 130, 62, 59, 188, 3, 223, 26, 102, 40, 174, 40, 178, 216, 108];
+    const derivedBitsArray = new Uint8Array(key.derivedBits);
+    subSpec(derivedBitsArray.length === expectedBits.length && derivedBitsArray.every((value, index) => (value === expectedBits[index])), "samePhraseGivesSameBits");
+  });
+
+  await spec("generateCryptoKey", async function(beforeEach) {
+    const phrase = "testPhrase😀";
+    const saltArray = [197, 10, 102, 7, 212, 38, 199, 41, 5, 219, 133, 188, 185, 33, 233, 66];
+    const salt = new Uint8Array(saltArray);
+
+    const key = await beforeEach.target.generateCryptoKey(phrase, salt);
+
+    subSpec(key.derivedKey instanceof CryptoKey, "generatesCryptoKeyByDeriving");
+    subSpec(beforeEach.subtleCryptoLogger.log.deriveKey.length === 1, "useDeriveKeyOnce");
+    subSpec(beforeEach.subtleCryptoLogger.log.deriveKey[0].arguments[0].name === "PBKDF2", "usesPBKDF2");
+    subSpec(beforeEach.subtleCryptoLogger.log.deriveKey[0].arguments[0].hash === "SHA-256", "hashIsSHA-256");
+    subSpec(beforeEach.subtleCryptoLogger.log.deriveKey[0].arguments[0].iterations >= 100000, "iterationAtLeastOneHundredThousand");
+    subSpec(beforeEach.subtleCryptoLogger.log.deriveKey[0].arguments[2].name === "AES-GCM", "usesAES-GCM");
+    subSpec(beforeEach.subtleCryptoLogger.log.deriveKey[0].arguments[2].length >= 256, "aesBitLengthAtLeast256");
+
+    const algorithmSalt = beforeEach.subtleCryptoLogger.log.deriveKey[0].arguments[0].salt;
+    subSpec(algorithmSalt instanceof Uint8Array, "algorithmSaltIsAnInstanceOfUint8Array");
+    subSpec(algorithmSalt.length === saltArray.length && algorithmSalt.every((value, index) => (value === saltArray[index])), "saltRemains");
+  });
+
+  await spec("encodeDecodeRoundTrip", async function(beforeEach){
+    const phrase = "testPhrase😅";
+    const plainText = "test plain text!";
+    const encoded = await beforeEach.target.encode(phrase, plainText);
+    const decoded = await beforeEach.target.decode(phrase, encoded);
+    subSpec(plainText === decoded, "matchesToOriginal");
+
+    subSpec(beforeEach.subtleCryptoLogger.log.encrypt.length === 1, "useEncryptOnce");
+    subSpec(beforeEach.subtleCryptoLogger.log.decrypt.length >= 1, "useDecryptAtLeastOnce");
+
+    subSpec(beforeEach.subtleCryptoLogger.log.encrypt[0].arguments[0].name === "AES-GCM", "useAES-GCM");
+    subSpec(beforeEach.subtleCryptoLogger.log.encrypt[0].arguments[0].iv, "useInitializationVector");
+    subSpec(beforeEach.subtleCryptoLogger.log.encrypt[0].arguments[0].additionalData, "useAdditionalDataToAuthenticate");
+    subSpec(beforeEach.subtleCryptoLogger.log.encrypt[0].arguments[0].tagLength >= 128, "tagLengthAtLeast128");
+  });
+
+  await spec("encodeAlwaysRandomized", async function(beforeEach){
+    const plainText = "Plain text to protect.";
+    const phrase = "testPhrase‼";
+    const saltArray = [197, 10, 102, 7, 212, 38, 199, 41, 5, 219, 133, 188, 185, 33, 233, 66];
+    const salt = new Uint8Array(saltArray);
+    const key = await beforeEach.target.generateCryptoKey(phrase, salt);
+    const encoded = await Promise.all([0, 1].map(() => beforeEach.target.encode(phrase, plainText)));
+    const results = await Promise.all(encoded.map(async (anEncodedText) => ({ encoded: anEncodedText, decoded: 
+      await beforeEach.target.decode(phrase, anEncodedText)
+    })));
+    subSpec(results[0].encoded !== results[1].encoded, "twoEncodingsGiveDifferentResults");
+    for (const result of results) {
+      subSpec(result.decoded === plainText, "bothCanRoundTrip");
+    }
+  });
+
+  await spec("decodePastExample", async function(beforeEach){
+    const phrase = "PastExamplePhrase";
+    const plainText = "Past example original plain-text";
+    const encoded = "QcTu/JHbbF+VuzDTqIETpckDWF9Q+xSm6U2Fk8A6v1cRVb86Xpwveg0cByAcUJmi9UbFCRYzD3o+zgkw95iV4JAJRmxBiCRnpn7HrA==";
+    subSpec(plainText === await beforeEach.target.decode(phrase, encoded), "pastEncodeDataShouldRemainDecodable");
+  });
+
+  await spec("decodeWithWrongPhrase", async function(beforeEach){
+    const phrase = "correctPhrase";
+    const plainText = "test plain text to fail";
+    const encoded = await beforeEach.target.encode(phrase, plainText);
+
+    const wrongPhrase = "wrongPhrase";
+    const error = await getErrorFromFunction(async () => await beforeEach.target.decode(wrongPhrase, encoded));
+    subSpec(error, "wrongPhraseShouldNotReturnAnyValueToPreventFromPhraseGuessing");
+  });
+
+  await spec("phraseStrengthComparisons", async function(beforeEach) {
+    const specs = [
+      { weaker: "", stronger: "1", name: "emptyPhraseIsWeakest" },
+      { weaker: " ", stronger: "1", name: "spaceIsWeakerThanOtherSingleCharacters" },
+      { weaker: "1", stronger: "a", name: "numberIsWeakerThanAlphabet" },
+      { weaker: "1", stronger: "!", name: "numberIsWeakerThanSymbol" },
+      { weaker: "a", stronger: "!", name: "alphabetIsWeakerThanSymbol" },
+      { weaker: "a", stronger: "ab", name: "shorterMeansWeaker" },
+      { weaker: "ab", stronger: "aB", name: "mixingUpperAndLowerCasesMakesStrongerThanLowerOnly" },
+      { weaker: "AB", stronger: "aB", name: "mixingUpperAndLowerCasesMakesStrongerThanUpperOnly" },
+      { weaker: "!!!!", stronger: "1aB!", name: "mixingNumberLowerUpperAndSymbolIsStrongerThanSymbolOnly" },
+    ];
+
+    for (const specData of specs) {
+      const bitLengthToBeWeaker = beforeEach.target.estimatePhraseStrengthBitLength(specData.weaker);
+      const bitLengthToBeStronger = beforeEach.target.estimatePhraseStrengthBitLength(specData.stronger);
+      subSpec(bitLengthToBeWeaker < bitLengthToBeStronger, `${specData.name}.bitLength`);
+
+      const categoryToBeWeakerOrEqual = beforeEach.target.estimatePhraseStrengthCategory(specData.weaker);
+      const categoryToBeStrongerOrEqual = beforeEach.target.estimatePhraseStrengthCategory(specData.stronger);
+      subSpec(categoryToBeWeakerOrEqual <= categoryToBeStrongerOrEqual, `${specData.name}.category`);
+    }
+  });
+
+  await spec("phraseStrengthCategorySpotCheck", async function(beforeEach) {
+    const specs = [
+      { phrase: "", category: beforeEach.target.phraseStrengthCategory.none },
+      { phrase: "1234567890123", category: beforeEach.target.phraseStrengthCategory.weak },
+      { phrase: "1234567890123456789", category: beforeEach.target.phraseStrengthCategory.moderate },
+      { phrase: "ABCDEFGHI", category: beforeEach.target.phraseStrengthCategory.weak },
+      { phrase: "ABCDEFGHIJKLM", category: beforeEach.target.phraseStrengthCategory.moderate },
+      { phrase: "abcdefghi", category: beforeEach.target.phraseStrengthCategory.weak },
+      { phrase: "abcdefghijklm", category: beforeEach.target.phraseStrengthCategory.moderate },
+      { phrase: "@Bc4567", category: beforeEach.target.phraseStrengthCategory.weak },
+      { phrase: "@Bc456789", category: beforeEach.target.phraseStrengthCategory.moderate },
+      { phrase: "@Bc456789012", category: beforeEach.target.phraseStrengthCategory.strong },
+    ];
+    for (const specData of specs) {
+      const category = beforeEach.target.estimatePhraseStrengthCategory(specData.phrase);
+      subSpec(category === specData.category, `phrase("${specData.phrase}")`);
+    }
+  });
+
+  logMessage(`Testing done. #specs: ${specCount}, #successful tests: ${successCount}, #failed tests: ${failureCount}`);
+}
+
+const viewModel = (function() {
+  let pageElements = null;
+  function getPageElements() {
+    if (!pageElements) {
+      pageElements = {
+        applicationSection: document.getElementById("application-section"),
+        languageSelector: document.getElementById("language-selector"),
+        encodeRadio: document.getElementById("encode-radio"),
+        decodeRadio: document.getElementById("decode-radio"),
+        encodingContainer: document.getElementById("encoding-container"),
+        decodingContainer: document.getElementById("decoding-container"),
+        plain: document.getElementById("plain"),
+        encoded: document.getElementById("encoded"),
+        decoded: document.getElementById("decoded"),
+        phraseEncode: document.getElementById("phrase-encode-hider"),
+        phraseRetype: document.getElementById("phrase-retype-hider"),
+        phraseDecode: document.getElementById("phrase-decode-hider"),
+        phraseEvaluation: document.getElementById("phrase-evaluation"),
+        phraseInput: document.getElementById("phrase-input"),
+        encodeResultMessage: document.getElementById("encode-result-message"),
+        decodeResultMessage: document.getElementById("decode-result-message"),
+        copyResultMessage: document.getElementById("copy-result-message"),
+      };
+    }
+    return pageElements;
+  }
+
+  let currentLanguageCache = null;
+  function getCurrentLanguage() {
+    if (!currentLanguageCache) {
+      const queryRaw = window.location.search;
+      const queryString = queryRaw.charAt(0) === "?" ? queryRaw.substring(1) : queryRaw;
+      const queries = queryString.split("&");
+      const languageQueries = queries.filter((query) => (query.substring(0, 2) === "l="));
+      if (languageQueries.length > 0) {
+        currentLanguageCache = languageQueries[0].substring(2);
+      } else {
+        const availableLanguageList = Object.entries(resources).map((pair) => (pair[0]));
+        const userPreferredLanguage = window.navigator.languages.map(
+          (userLanguage) => availableLanguageList.find((availableLanguage) => (userLanguage === availableLanguage || userLanguage.startsWith(availableLanguage + "-")))
+        ).find((availableLanguage) => !!availableLanguage);
+        currentLanguageCache = (!!userPreferredLanguage) ? userPreferredLanguage : "en";
+      }
+    }
+    return currentLanguageCache;
+  }
+
+  function getResource(id, languageOrUndefined) {
+    // const language = languageOrUndefined ?? getCurrentLanguage();
+    // return (resources[language] ?? resources["en"])[id] ?? resources["en"][id];
+    // "??" nullish coalescing operator operator is quiee new and some browsers may not support it, in which case the parsing error could block the whole script block.
+    const language = languageOrUndefined ? languageOrUndefined : getCurrentLanguage();
+    const languageResources = resources[language];
+    const fallbackLanguageResources = resources["en"];
+    const resourceCandidate = (languageResources ? languageResources : fallbackLanguageResources)[id];
+    return resourceCandidate ? resourceCandidate : fallbackLanguageResources[id];
+  }
+
+  function stringifyError(error) {
+    if (error && error instanceof DOMException) {
+      return getResource("decodingErrorMessage").replace("${0}", error.toString());
+    } if (error && typeof error.toString === "function") {
+      return error.toString();
+    } else {
+      return getResource("unknownErrorMessage");
+    }
+  }
+
+  function constructor() {
+    function applyResource() {
+      const currentLanguage = getCurrentLanguage();
+      document.body.lang = currentLanguage;
+      for (const element of document.querySelectorAll("[data-resource-id]")) {
+        if (element instanceof HTMLElement) {
+          const id = element.getAttribute("data-resource-id");
+          const targetListCommaSeparated = element.getAttribute("data-resource-target");
+          if (targetListCommaSeparated) {
+            for (const target of targetListCommaSeparated.split(",")) {
+              const resource = getResource(id, currentLanguage);
+              if (target === "innerText") {
+                element.innerText = resource;
+              } else { // attribute target
+                element.setAttribute(target, resource);
+             }
+           }
+          } else {
+            throw new Error(`Bug: data-resource-target not found for id "${id}"`);
+          }
+        }
+      }
+    }
+
+    function buildLanguageSelector() {
+      const elements = getPageElements();
+      const currentLanguage = getCurrentLanguage();
+      for (const language of Object.entries(resources).map((pair) => (pair[0]))) {
+        const selectElement = document.createElement("option");
+        selectElement.value = language;
+        selectElement.text = getResource("languageName", language);
+        const isDefaultSelected = (language === currentLanguage);
+        selectElement.defaultSelected = isDefaultSelected;
+        selectElement.selected = isDefaultSelected;
+        elements.languageSelector.appendChild(selectElement);
+      }
+    }
+
+    function initializeInputHider() {
+      // When more than one password input field exist in one page, Safari on iOS 13.4 freezes longer than a minute when the user touches on the second field.
+      // Working around it by reusing the same input, and present the pseudo element at the originally deired place.
+      const elements = getPageElements();
+      const inputHiderElementList = Array.from(document.querySelectorAll(".input-hider"));
+
+      for (const inputHider of inputHiderElementList) {
+        inputHider.addEventListener("focus", function (event) {
+          // First hide the input
+          elements.phraseInput.style.setProperty("display", "none");
+
+          // Recover the previous value
+          const previousValue = inputHider.getAttribute("data-value");
+          if (previousValue) {
+            elements.phraseInput.value = previousValue;
+          }
+
+          // Remember the current target
+          elements.phraseInput.setAttribute("data-target-id", inputHider.id);
+
+          // Recover the visibility
+          inputHider.style.setProperty("display", "none");
+          elements.phraseInput.parentElement.removeChild(elements.phraseInput);
+          inputHider.parentElement.insertBefore(elements.phraseInput, inputHider);
+          elements.phraseInput.style.setProperty("display", "inline-block");
+          elements.phraseInput.focus();
+        });
+      }
+      elements.phraseInput.addEventListener("blur", function (event) {
+        // Get the current target element.
+        const targetHider = document.getElementById(elements.phraseInput.getAttribute("data-target-id"));
+
+        // Clear the value so that the next focus would not hit the same bug.
+        const value = elements.phraseInput.value;
+        targetHider.setAttribute("data-value", value);
+        elements.phraseInput.value = "";
+
+        // Show * in the hider
+        targetHider.children[0].innerText = "*".repeat(value.length); // Assume a child as a text holder
+
+        // Recover the visibility
+        elements.phraseInput.style.setProperty("display", "none");
+        targetHider.style.setProperty("display", "inline-block");
+      });
+    }
+
+    function setCryptoLogicErrorMessages() {
+      cryptoLogic.setErrorMessages({
+        subtleNotFound: getResource("subtleNotFoundErrorMessage"),
+        getRandomValuesNotFound: getResource("getRandomValuesNotFoundErrorMessage"),
+      });
+    }
+
+    this.DOMContentLoaded = function(event) {
+      const elements = getPageElements();
+      elements.encodeRadio.checked = true;
+      this.onEncodeDecodeRadioChanged();
+
+      initializeInputHider();
+
+      applyResource();
+      buildLanguageSelector();
+      setCryptoLogicErrorMessages();
+    };
+    window.addEventListener("DOMContentLoaded", this.DOMContentLoaded.bind(this));
+
+    this.onLanguageSelectorInput = function() {
+      const elements = getPageElements();
+
+      elements.plain.value = "";
+      elements.encoded.value = "";
+      elements.decoded.value = "";
+      elements.phraseInput.value = "";
+
+      window.location.replace(`?l=${elements.languageSelector.value}`);
+    };
+
+    this.onDetailsLinkClick = function() {
+      window.location.replace(`#Details-${getCurrentLanguage()}`); // TODO: when adding more languages, put a fallback logic here in case details are not available.
+    };
+
+    this.onEncodeDecodeRadioChanged = function() {
+      const elements = getPageElements();
+      elements.encodingContainer.style.setProperty("display", elements.encodeRadio.checked ? "block" : "none");
+      elements.decodingContainer.style.setProperty("display", elements.decodeRadio.checked ? "block" : "none");
+
+      //elements.encoded.readOnly = elements.encodeRadio.checked; // Read-only textarea is not selectable on iOS 13.4
+      (elements.encodeRadio.checked ? elements.encodeResultMessage : elements.decodeResultMessage).innerText = "";
+      (elements.encodeRadio.checked ? elements.encoded : elements.decoded).value = "";
+
+      elements.copyResultMessage.innerText = "";
+    };
+
+    async function convert(toEncode, sourceTextArea, targetTextArea, resultElement, phraseInput, retypeInput) {
+      let resultMessage = "";
+      try {
+        const phrase = phraseInput.getAttribute("data-value") || phraseInput.value;
+        if (retypeInput) {
+          if (!phrase) {
+            throw new Error(getResource("encodingPhraseStrengthNoneMessage"));
+          }
+          if (phrase !== (retypeInput.getAttribute("data-value") || retypeInput.value)) {
+            throw new Error(getResource("encodingPhraseMismatchErrorMessage"));
+          }
+        }
+        const logic = new cryptoLogic();
+        const result = await (toEncode ? logic.encode : logic.decode).bind(logic)(phrase, sourceTextArea.value);
+        targetTextArea.value = result;
+        return result;
+      } catch (error) {
+        targetTextArea.value = "";
+        resultMessage = stringifyError(error);
+        if (retypeInput) {
+          retypeInput.value = "";
+        } else {
+          phraseInput.value = "";
+        }
+      } finally {
+        resultElement.innerText = resultMessage;
+      }
+    }
+
+    this.onEncodeButtonPressed = async function() {
+      const elements = getPageElements();
+      await convert(true, elements.plain, elements.encoded, elements.encodeResultMessage, elements.phraseEncode, elements.phraseRetype);
+    };
+
+    this.onDecodeButtonPressed = async function() {
+      const elements = getPageElements();
+      const result = await convert(false, elements.encoded, elements.decoded, elements.decodeResultMessage, elements.phraseDecode);
+      if (result) {
+        elements.plain.value = result; // Allow decoding, editing, and encoding back.
+      }
+    };
+
+    this.onSourceTextInput = function(isPlain) {
+      const elements = getPageElements();
+
+      // Encoded text could change either by the user or by the encoding button. Just clear both in case of the source isPlain.
+
+      if (isPlain) {
+        elements.encoded.value = "";
+        elements.encodeResultMessage.innerText = "";
+      }
+      elements.decoded.value = "";
+      elements.decodeResultMessage.innerText = "";
+      elements.copyResultMessage.innerText = "";
+    };
+
+    this.onEditButtonPressed = function () {
+      const elements = getPageElements();
+      elements.encodeRadio.checked = true;
+      this.onEncodeDecodeRadioChanged();
+      window.scrollTo(0, 0);
+      elements.plain.focus();
+    };
+
+    this.onEncodedTextFocus = function(){
+      const elements = getPageElements();
+      const range = document.createRange();
+      range.selectNodeContents(elements.encoded);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      elements.encoded.setSelectionRange(0, elements.encoded.value.length);
+    };
+
+    this.copyResultButtonPressed = async function() {
+      const elements = getPageElements();
+      let resultMessage = "";
+      try {
+        let clipboardWritePermissionState = "";
+        try {
+          const clipboardWritePermission = await navigator.permissions.query({name:'clipboard-write'});
+          clipboardWritePermissionState = clipboardWritePermission.state;
+        } catch (error) { /* some browsers may not support the permissions API but provides the clipboard API */ }
+        if ((clipboardWritePermissionState && clipboardWritePermissionState !== "granted") || !navigator.clipboard || !navigator.clipboard.writeText) {
+          throw new Error(getResource("clipboardWriteAccessNotAllowedErrorMessage"));
+        }
+
+        const resultTextArea = elements.encodeRadio.checked ? elements.encoded : elements.decoded;
+        const result = resultTextArea.value;
+        await navigator.clipboard.writeText(result);
+        resultMessage = getResource("clipboardWriteSuccessMessage");
+      } catch (error) {
+        resultMessage = stringifyError(error);
+      } finally {
+        elements.copyResultMessage.innerText = resultMessage;
+      }
+    };
+
+    const encodePhraseValidationDelayInMillisec = 100; // To batch up the events.
+    let lastEncodePhraseValidationTimer = 0;
+    const phraseStrengthData = [
+      { message: "encodingPhraseStrengthNoneMessage", color: "darkred" }, // phraseStrengthCategory.none
+      { message: "encodingPhraseStrengthWeakMessage", color: "red" }, // phraseStrengthCategory.weak
+      { message: "encodingPhraseStrengthModerateMessage", color: "orange" }, // phraseStrengthCategory.moderate
+      { message: "encodingPhraseStrengthStrongMessage", color: "green" }, // phraseStrengthCategory.strong
+    ];
+    this.onPhraseInput = function() {
+      // Wait for some time before starting the validation.
+      if (lastEncodePhraseValidationTimer) {
+        clearTimeout(lastEncodePhraseValidationTimer);
+      }
+      lastEncodePhraseValidationTimer = setTimeout(function() {
+        const elements = getPageElements();
+        if (elements.phraseInput.getAttribute("data-target-id") !== "phrase-encode-hider") {
+          return; // nothing to do if the input is not against the original new phrase.
+        }
+        let resultMessage = "";
+        let resultColor = "black"
+        try {
+          const phrase = elements.phraseInput.value;
+          const logic = new cryptoLogic();
+          const strength = logic.estimatePhraseStrengthCategory(phrase);
+          const strengthData = phraseStrengthData[strength];
+          resultMessage = getResource(strengthData.message);
+          resultColor = strengthData.color;
+        } catch (error) {
+          resultMessage = stringifyError(error);
+          resultColor = "red"
+        } finally {
+          elements.phraseEvaluation.innerText = resultMessage;
+          elements.phraseEvaluation.style.setProperty("color", resultColor);
+        }
+      }, encodePhraseValidationDelayInMillisec );
+    }
+  };
+  return new constructor();
+})();
+
+const resources = {
+ "en": {
+    title: "Note Shield",
+    _comment_title: "Page title as well as the page header.",
+
+    description: "This page can shield your note with an encryption pass-phrase or recover it from the shielded text. The note cannot be recovered without your pass-phrase. The page does not send any information about your pass-phrase or note to outside your device.",
+    _comment_description: "The sentence to describe what the HTML page provides.",
+
+    detailsLinkText: "Details...",
+    _comment_detailsLinkText: "Clicking the link scrolls the page to the 'Details' section of the page.",
+
+    languageSelectorLabel: "Page Language:",
+    _comment_languageSelectorLabel: "Drop-down box to change the current UI language.",
+
+    languageName: "English",
+    _comment_languageName: "The name of the current language. For example, when translating to French in France, do not put 'Anglaise' here but 'Français'.",
+
+    actionRadioGroupLabel: "Operation:",
+    _comment_actionRadioGroupLabel: "Label for the group of radio buttons that decide what to do with the page.",
+
+    encodeRadioLabel: "Shield",
+    _comment_encodeRadioLabel: "Radio button to change the page mode to start encoding the text.",
+　　
+    decodeRadioLabel: "Recover",
+    _comment_decodeRadioLabel: "Radio button to change the page mode to start decoding the text.",
+
+    plainTextAreaLabel: "Note",
+    _comment_plainTextAreaLabel: "Text input box where the user can type or paste the original text to encode.",
+
+    encodedTextAreaLabel: "Shielded Text",
+    _comment_encodedTextAreaLabel: "Text input box where the user can get or paste the encoded text.",
+
+    decodedTextAreaLabel: "Recovered Note",
+    _comment_decodedTextAreaLabel: "Text input box where the user can get the decoded text.",
+
+    phraseForEncodingTextBoxLabel: "Pass-Phrase:",
+    _comment_phraseForEncodingTextBoxLabel: "Text input box where the user can type the pass phrase for encoding.",
+
+    phraseRetypingTextBoxLabel: "Re-enter and Verify:",
+    _comment_phraseForEncodingTextBoxLabel: "Text input box where the user may type again the pass phrase for encoding.",
+
+    phraseForDecodingTextBoxLabel: "Pass-Phrase:",
+    _comment_phraseForDecodingTextBoxLabel: "Text input box where the user can type the pass phrase for decoding.",
+
+    encodeButtonLabel: "Shield",
+    _comment_encodeButtonLabel: "Button to start the encoding.",
+
+    decodeButtonLabel: "Recover",
+    _comment_decodeButtonLabel: "Button to start the decoding",
+
+    encodingPhraseMismatchErrorMessage: "Initial and re-entered pass-phrases do not match.",
+    _comment_encodingPhraseMismatchErrorMessage: "The text boxes for the phrase for encoding do not match up. The user is likely to have mistyped.",
+
+    encodingPhraseStrengthNoneMessage: "Enter pass-phrase.",
+    _comment_encodingPhraseStrengthNoneMessage: "The user has started typing the phrase for encoding but the text box became empty e.g. by backspace.",
+
+    encodingPhraseStrengthWeakMessage: "Simple phrases result in weak shielding.",
+    _comment_encodingPhraseStrengthWeakMessage: "The user has started typing the phrase for encoding but the phrase is too simple to be secure.",
+
+    encodingPhraseStrengthModerateMessage: "More complex phrases make shielding even stronger.",
+    _comment_encodingPhraseStrengthModerateMessage: "The user has started typing the phrase for encoding and the phrase looks not too simple but still not one of the strongest.",
+
+    encodingPhraseStrengthStrongMessage: "Character kinds and length look complex.",
+    _comment_encodingPhraseStrengthStrongMessage: "The phrase for encoding looks quite strong, based on character-by-character analysis.",
+
+    encodingPhraseRecommendationMessage: "Avoid using place names, people names, and words in dictionaries, or typing keys in the order of the keyboard.",
+    _comment_encodingPhraseRecommendationMessage: "Help message under the encoding pass-phrase",
+
+    decodingErrorMessage: "The browser returned the error \"${0}\". Check the pass-phrase again.",
+    _comment_decodingErrorMessage: "The error is likely to be due to the wrong pass phrase but not always. ${0} is replaced with the error text from the browser.",
+
+    editPlainTextButtonLabel: "Edit Note",
+    _comment_editPlainTextButtonLabel: "Button to copy the decoded text to the editable text field so that the user can start modifing and encoding it again.",
+
+    copyResultButtonLabel: "Copy Result to Clipboard",
+    _comment_copyResultButtonLabel: "Button to copy the decoded text to the clipboard.",
+
+    clipboardWriteSuccessMessage: "Copied.",
+    _comment_clipboardWriteSuccessMessage: "The user pressed the copy-result button and no error is discovered. Without the message, it looks like the button-press did nothing.",
+
+    clipboardWriteAccessNotAllowedErrorMessage: "The browser does not permit the page to change the clipboard. Click on the result text field and copy there.",
+    _comment_clipboardWriteAccessNotAllowedErrorMessage: "The user pressed the copy-result button but the browser returned the permission error while accessing to the clipboard.",
+
+    subtleNotFoundErrorMessage: "Web Crypto library is not found. The browser may be too old or the file could be from HTTP (non-HTTPS) server.",
+    _comment_subtleNotFoundErrorMessage: "window.crypto.subtle is not found.",
+
+    getRandomValuesNotFoundErrorMessage: "Web Crypto random function is not found. The browser is too old.",
+    _comment_getRandomValuesNotFoundErrorMessage: "window.crypto.getRandomValues is not found.",
+
+    unknownErrorMessage: "Unknown Error",
+    _comment_unknownErrorMessage: "Presented in case of an error without any text information.",
+  },
+
+  "ja": {
+    title: "メモ シールド (Note Shield)",
+    description: "このページでは、メモを暗号用の合言葉でシールド（保護）して読めないテキストにしたり、それを復元したりできます。合言葉を知らないと、元のメモは復元できません。あなたのパソコンやスマホから外部にメモの内容や合言葉が送られることはありません。",
+    detailsLinkText: "詳細...",
+    languageSelectorLabel: "ページの言語：",
+    languageName: "日本語",
+    actionRadioGroupLabel: "操作：",
+    encodeRadioLabel: "シールド",
+    decodeRadioLabel: "復元",
+    plainTextAreaLabel: "メモ",
+    encodedTextAreaLabel: "シールド済みテキスト",
+    decodedTextAreaLabel: "復元されたメモ",
+    phraseForEncodingTextBoxLabel: "合言葉：",
+    phraseRetypingTextBoxLabel: "もう一度入力して確認：",
+    phraseForDecodingTextBoxLabel: "合言葉：",
+    encodeButtonLabel: "シールド",
+    decodeButtonLabel: "復元",
+    encodingPhraseMismatchErrorMessage: "最初の合言葉と、もう一度入力した合言葉が異なります。",
+    encodingPhraseStrengthNoneMessage: "合言葉を入力してください。",
+    encodingPhraseStrengthWeakMessage: "単純な合言葉はシールドが弱くなります。",
+    encodingPhraseStrengthModerateMessage: "より複雑な合言葉ほどシールドが強くなります。",
+    encodingPhraseStrengthStrongMessage: "文字種と長さとしては複雑な合言葉です。",
+    encodingPhraseRecommendationMessage: "地名、人名、辞書にある単語を使ったり、キーボードの並びに通りにキーを押すのは避けましょう。",
+    decodingErrorMessage: "合言葉を再度確認してください。ブラウザが次のエラーを返しました。「${0}」",
+    editPlainTextButtonLabel: "メモを編集",
+    copyResultButtonLabel: "結果をクリップボードにコピー",
+    clipboardWriteSuccessMessage: "コピーされました。",
+    clipboardWriteAccessNotAllowedErrorMessage: "ブラウザが、このページのクリップボードへの操作を拒否しました。結果のテキストをクリックして、そこでコピーしてください。",
+    subtleNotFoundErrorMessage: "Web Crypto ライブラリが見つかりません。ブラウザが古すぎるか、ファイルがHTTPSではなくHTTPのサーバーにある可能性があります。",
+    getRandomValuesNotFoundErrorMessage: "Web Crypto 乱数関数が見つかりません。ブラウザが古すぎます。",
+    unknownErrorMessage: "未知のエラー",
+  },
+};
+// TODO: find how to localize into more languages.
+// Spanish, French, Chinese (Simplified, Traditional), German, Portguese (pt-BR), and Russian would give a good coverage.
+// Arabic or Hebrew may need Right-to-Left support with "DIR" attribute in BODY element.
+// Supporting language regions may need code changes as well.
+
+// Progressive web app service worker registration. For now, always try to update.
+if (navigator.serviceWorker && window.location.protocol.toLowerCase().startsWith("https:")) {
+  (async function(){
+    const serviceWorkerRegistration = await navigator.serviceWorker.register("NoteShield.ServiceWorker.js");
+    serviceWorkerRegistration.update();
+  })();
+}
+</script>
+<!-- TODO: need a designer for the UI design polish... -->
+<style type="text/css">
+@media (prefers-color-scheme: dark) {
+  body, select, input[type="password"], textarea, button {
+    color: white;
+    background-color: black;
+  }
+  a {
+    color:deepskyblue;
+  }
+}
+
+input[type="password"], textarea, select, button {
+  font-size: inherit;
+}
+textarea {
+  width: calc(100% - 12px); /* to secure the border space */
+  margin: auto;
+  resize: none;
+}
+.message-area {
+  color: red;
+}
+.emoji-container {
+  font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla, twemoji mozilla, segoe ui symbol;
+}
+.right-align-container {
+  text-align: right;
+}
+
+/* Ref) initializeInputHider() */
+input[type="password"], .input-hider {
+  width: 150px;
+  height: 22px;
+
+  border-color: gray;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 2px;
+
+  padding: 1px 2px;
+
+  cursor: text;
+}
+.input-hider {
+  display: inline-block;
+  vertical-align: bottom;
+}
+.input-hider span {
+  vertical-align: sub;
+  font-size: 12px;
+  font-weight: bold;
+}
+</style>
+</head>
+<body>
+  <p id="javascript-disabled-text" class=".message-area">
+    This page depends on JavaScript. If this message persists, the page could not run the script. Check the browser setting to see whether JavaScript is enabled.
+  </p>
+  <script type="text/javascript">
+    const javaScriptDisabledTextElement = document.getElementById("javascript-disabled-text");
+    javaScriptDisabledTextElement.parentElement.removeChild(javaScriptDisabledTextElement);
+  </script>
+  <span id="application-section">
+    <h1>
+      <span class="emoji-container">🛡</span>
+      <span data-resource-id="title" data-resource-target="innerText"></span>
+    </h1>
+    <p>
+      <span data-resource-id="description" data-resource-target="innerText"></span>
+      <a data-resource-id="detailsLinkText" data-resource-target="innerText" onclick="viewModel.onDetailsLinkClick()" href="javascript:"></a>
+    </p>
+    <p>
+      <label for="language-selector">
+        <span class="emoji-container">🌐</span>
+        <span data-resource-id="languageSelectorLabel" data-resource-target="innerText"></span>
+      </label>
+      <select id="language-selector" oninput="viewModel.onLanguageSelectorInput()"></select>
+    </p>
+    <p style="cursor:default;"><!-- Spaces around the radio inputs may flicker the mouse cursor as the user hovers over around these elements. -->
+      <label><span data-resource-id="actionRadioGroupLabel" data-resource-target="innerText"></span></label>
+      <input type="radio" id="encode-radio" name="conversion-direction" value="encode" data-resource-id="encodeRadioLabel" data-resource-target="aria-label" onchange="viewModel.onEncodeDecodeRadioChanged()"/><label for="encode-radio" data-resource-id="encodeRadioLabel" data-resource-target="innerText"></label>
+      <input type="radio" id="decode-radio" name="conversion-direction" value="decode" data-resource-id="decodeRadioLabel" data-resource-target="aria-label" onchange="viewModel.onEncodeDecodeRadioChanged()"/><label for="decode-radio" data-resource-id="decodeRadioLabel" data-resource-target="innerText"></label>
+    </p>
+    <div id="encoding-container">
+      <p>
+        <div><label for="plain">
+          <span class="emoji-container">📝</span>
+          <span data-resource-id="plainTextAreaLabel" data-resource-target="innerText"></span></label>
+        </div>
+        <div><textarea id="plain" rows="10" data-resource-id="plainTextAreaLabel" data-resource-target="aria-label" oninput="viewModel.onSourceTextInput(true)"></textarea></div>
+      </p>
+      <table>
+        <tbody>
+          <tr>
+            <td>
+              <label for="phrase-encode-hider">
+                <span class="emoji-container">🔑</span>
+                <span data-resource-id="phraseForEncodingTextBoxLabel" data-resource-target="innerText"></span>
+              </label>
+            </td>
+            <td><span id="phrase-encode-hider" class="input-hider" data-for="phrase-encode" tabindex="0"><span></span></span></td>
+          </tr>
+          <tr>
+            <td><label for="phrase-retype-hider" data-resource-id="phraseRetypingTextBoxLabel" data-resource-target="innerText"></label></td>
+            <td><span id="phrase-retype-hider" class="input-hider" data-for="phrase-retype" tabindex="0"><span></span></span></td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        <span id="phrase-evaluation"></span>
+        <span data-resource-id="encodingPhraseRecommendationMessage" data-resource-target="innerText"></span>
+      </p>
+      <div><button data-resource-id="encodeButtonLabel" data-resource-target="innerText,aria-label" onclick="viewModel.onEncodeButtonPressed()"></button></div>
+      <p><span id="encode-result-message" class="message-area"></span></p>
+    </div>
+    <p>
+      <div>
+        <label for="encoded">
+          <span class="emoji-container">🛡</span>
+          <span data-resource-id="encodedTextAreaLabel" data-resource-target="innerText"></span>
+        </label>
+      </div>
+      <div>
+        <!-- Removing readonly="true": see onEncodeDecodeRadioChanged() -->
+        <textarea id="encoded" rows="10" data-resource-id="encodedTextAreaLabel" data-resource-target="aria-label" oninput="viewModel.onSourceTextInput(false)" onfocus="viewModel.onEncodedTextFocus()"></textarea>
+      </div>
+    </p>
+    <div id="decoding-container" style="display:none;">
+      <p>
+        <label for="phrase-decode-hider">
+          <span class="emoji-container">🔑</span>
+          <span data-resource-id="phraseForDecodingTextBoxLabel" data-resource-target="innerText"></span>
+        </label>
+        <span id="phrase-decode-hider" class="input-hider" data-for="phrase-decode" tabindex="0"><span></span></span>
+        <button data-resource-id="decodeButtonLabel" data-resource-target="innerText,aria-label" onclick="viewModel.onDecodeButtonPressed()"></button>
+      </p>
+      <p><span id="decode-result-message" class="message-area"></span></p>
+      <p>
+        <div>
+          <label for="decoded">
+            <span class="emoji-container">📝</span>
+            <span data-resource-id="decodedTextAreaLabel" data-resource-target="innerText"></span>
+          </label>
+        </div>
+        <div>
+          <!-- Removing readonly="true": see onEncodeDecodeRadioChanged() -->
+          <textarea id="decoded" rows="10" data-resource-id="decodedTextAreaLabel" data-resource-target="aria-label"></textarea>
+        </div>
+      </p>
+      <p><button data-resource-id="editPlainTextButtonLabel" data-resource-target="innerText,aria-label" onclick="viewModel.onEditButtonPressed()"></button></p>
+    </div>
+    <p>
+      <button data-resource-id="copyResultButtonLabel" data-resource-target="innerText,aria-label" onclick="viewModel.copyResultButtonPressed()">Copy Result</button>
+      <span id="copy-result-message"></span>
+    </p>
+    <div style="display:none;">
+      <input id="phrase-input" type="password" autocomplete="off" oninput="viewModel.onPhraseInput()"/>
+    </div>
+    <hr/>
+  </span>
+  <span lang="en-US">
+    <h2 id="Details-en"><a href="#Details-en">Details</a></h2>
+    <p class="right-align-container"><a href="#Details-ja">Jump to Japanese / 日本語へ移動</a></p>
+    <h3>Features</h3>
+    <ul>
+      <li>
+        <p>Save your important information more safely</p>
+        <p>
+          It is hard to remember all the important information that you cannot let others know.
+          When saving such information, shield the note to save it more safely than to save it as-is.
+          You can check those information on any device by saving the shielded note to the file-sharing service or by sending it as a message to yourself.
+        </p>
+      </li>
+      <li>
+        <p>Protect your information with the latest technologies</p>
+        <p>
+          The latest technologies, like SHA-256 iterated 100,000 times or 128bit-authenticated AES, protect your information strongly.
+          Additionally, each shielding gets 96-bit randomization to complex and protect the result.
+          The shielded text can be uploaded to other apps and services more safely.
+        </p>
+      </li>
+      <li>
+        <p>Protect your privacy</p>
+        <p>Your information, including the pass-phrase and note themselves, may not be sent to outside your device.</p>
+      </li>
+      <li>
+        <p>Available forever</p>
+        <p>No dependency on any service or web sites. PC or smart phone, its operating system, a browser, and this page is all you need.</p>
+      </li>
+      <li>
+        <p>Pass-phrase strength check</p>
+        <p>The phrase to protect your note is automatically evaluated whether it is too simple. The 64bit-worth complex pass-phrase may need 100,000 guessing per second and 2.92 million years on average before the guess would break the protection.</p>
+        <p>(2 powered by 64 ÷ 100,000 guesses/second ÷ 2 (for median)) = (92 trillion seconds) = (2.92 million years)</p>
+      </li>
+      <li>
+        <p>Pass-phrase guessing protection</p>
+        <p>When the phrase is even slightly wrong, the recovery trial may give nothing. Others cannot compare multiple guessed phrases, to find which gives more meaningful result and is closer to the right phrase, as the wrong phrases provide no result.</p>
+      </li>
+      <li>
+        <p>100% open-source; anyone can verify</p>
+        <p>
+          All the encryption implementation is within this page and
+          <a href="https://github.com/YusukeBou/yusukebou.github.io/tree/main/NoteShield" target="_blank">all the pages are published</a>, even including icons.
+          Anyone with HTML and JavaScript knowledge can verify the page correctness. Moreover, <a href="#Test">dozens of test cases are automated</a> to require no engineer.
+        </p>
+      </li>
+    </ul>
+    <h3>Usage</h3>
+    <ul>
+      <li>
+        <p>Prepare to use this page.</p>
+        <ol>
+          <li>Get a PC or smart phone, OS, and a browser that you can trust.</li>
+          <li>Update OS and the browser to the latest.</li>
+          <li>Download and save this page or install this page as an app.</li>
+        </ol>
+        <p>
+          This page depends on PC or smart phone, OS, and the browser.
+          If these would leak your information or would not honor your privacy, then your information is not secure even if this page does not send any information to outside by itself.
+        </p>
+        <p>
+          To be prepared for the case the network would become unavailable or the page would be deleted from the Internet, save this page to your PC or install the page as an app.
+        </p>
+        <ul>
+          <li>
+            <p>Windows PC</p>
+            <ol>
+              <li><a href="microsoft-edge:https://yusukebou.github.io/NoteShield/NoteShield.html">Open this page with Microsoft Edge</a> after updating it to the latest.</li>
+              <li>Open menu from … button at around right-top corner and select "Apps" and "Install this site as an app".</li>
+              <li>Click "Install" button to get "Note Shield" app opened instead of a web page. The app is also added to Start menu.</li>
+            </ol>
+          </li>
+          <li>
+            <p>iPhone / iPad</p>
+            <ol>
+              <li>Open this page with the latest Safari browser.</li>
+              <li>Tap on Share button (box with up-arrow) at the bottom center of the browser.</li>
+              <li>Tap "Add to Home Screen".</li>
+              <li>Tap "Add" button to get "Note Shield" app icon on your home screen.</li>
+            </ol>
+          </li>
+          <li>
+            <p>Android</p>
+            <ol>
+              <li>Open this page with the latest Chrome browser.</li>
+              <li>Open menu from ： button at around right-top corner and select "Add to home screen".</li>
+              <li>Click "Install" button to add "Note Shield" app to the phone.</li>
+            </ol>
+          </li>
+        </ul>
+      </li>
+      <li>
+        <p>Shield your note.</p>
+        <ol>
+          <li>Ensure "Operation" has "Shield" selected.</li>
+          <li>Input your note to "<span class="emoji-container">📝</span> Note".</li>
+          <li>
+            Decide the pass-phrase to Shield your note and type it into "<span class="emoji-container">🔑</span> Pass-Phrase".
+            Mix upper-case and lower-case letters, symbols, and numbers to compose a long pass-phrase.
+            Do not use a people name, place name, or word in dictionaries as a starting point of the phrase choice or type keys in the order of the keyboard.
+            <p>
+              Note that <strong>too simple pass-phrases allows for others to</strong> try all the simple phrases and <strong>recover your original note</strong>.
+              Also, anyone who knows the phrase can recover your note. <strong>Keep the pass-phrase secret from anyone else</strong>.
+            </p>
+          </li>
+          <li>
+            Type the same phrase into "Re-enter and Verify".
+            <p>Note that <strong>you cannot recover your note if you forget the pass phrase</strong>. Use this field to catch any mistypes.</p>
+          </li>
+          <li>Press "Shield" button.</li>
+          <li>Press "Copy Result to Clipboard" button to copy the result in "<span class="emoji-container">🛡</span> Shielded Text" field to the clipboard.</li>
+          <li>Switch to the app to save the result and paste the clipboard.</li>
+        </ol>
+      </li>
+      <li>
+        <p>Recover your note from the shielded text.</p>
+        <ol>
+          <li>Copy the shielded text from the app you saved it.</li>
+          <li>Ensure "Operation" has "Recover" selected.</li>
+          <li>Paste from the clipboard to "<span class="emoji-container">🛡</span> Shielded Text".</li>
+          <li>Type in "🔑 Pass-Phrase" the phrase that you typed when shielding your note.</li>
+          <li>Press "Recover" button.</li>
+          <p>Note that <strong>you cannot recover your note if you forget the pass phrase</strong>.</p>
+        </ol>
+      </li>
+      <li>
+        <p>Edit the recovered note and shield it again.</p>
+        <ol>
+          <li>Follow the above "Recover your note from the shielded text" steps.</li>
+          <li>Press "Edit Note" button to switch the page for "Shielde" operation.</li>
+          <li>Edit in "<span class="emoji-container">📝</span> Note" field.</li>
+          <li>Follow the above "Shield your note" steps.</li>
+        </ol>
+      </li>
+    </ul>
+    <h3>Frequently asked questions</h3>
+    <ul>
+      <li>
+        <p>What is the problem of the simple pass-phrase?</p>
+        <p>The most basic method to break the encryption is to try all the possible passwords one by one. Because simpler phrases may come earlier during the trials, their shielded texts are recovered earlier by others.</p>
+      </li>
+      <li>
+        <p>Can I use this page to give my note safely to my friends?</p>
+        <p>This page does not provide any method to share the pass-phrase safely. In case the phrase is known to a third party, at worst, your original note could become available to anyone.</p>
+      </li>
+      <li>
+        <p>Does this page work with my browser?</p>
+        <p>
+          <p>As of January 2021, the following browsers are tested with this page.</p>
+          <ul>
+            <li>Mozilla Firefox Version 84.0.1 (64-bit) for Windows</li>
+            <li>Google Chrome Version 87.0.4280.88 (64-bit) for Windows</li>
+            <li>Microsoft Edge Version 87.0.664.66 (64-bit) for Windows</li>
+            <li>Safari in iOS 14.3</li>
+            <li>Safari in iOS 12.5 for iPad</li>
+            <li>Mozilla Firefox Version 30.0 for iOS</li>
+            <li>Google Chrome Version 87.0.4280.77 for iOS</li>
+            <li>Microsoft Edge Version 45.11.11 for iOS</li>
+            <li>Google Chrome Version 87.0.4280.101 for Android</li>
+          </ul>
+        </p>
+      </li>
+      <li>
+        <p>I forgot the pass-phrase. How can I recover my note?</p>
+        <p>Unfortunately, you cannot. If you could, then anyone could do that and recover your note.</p>
+      </li>
+    </ul>
+    <h3>Things to Improve</h3>
+    <ul>
+      <li>The page UI design is primitive and just as the browser provides by default.</li>
+      <li>The page is presented only in English and Japanese.</li>
+    </ul>
+    <p>Also refer to <a href="#License">License</a> section.</p>
+    <h3>Acknowledgment</h3>
+    <p>During the 2020 - 2021 winter holiday season, my daughter lent me her PC for a few days, resisting her desire for PC games. Thank you.</p>
+    <p>I spent a few days not for the works or for the household and my wife forgave me to do so. Thank you.</p>
+    <p>And I thank Notepad app and Chromium Projects.</p>
+    <p><a href="#" title="Back to top">Back to top</a></p>
+  </span>
+  <hr/>
+  <span lang="ja-JP">
+    <h2 id="Details-ja"><a href="#Details-ja">詳細</a></h2>
+    <p class="right-align-container"><a href="#Details-en">英語へ移動 / Jump to English</a></p>
+    <h3>機能</h3>
+    <ul>
+      <li>
+        <p>重要な情報をより安全に保存</p>
+        <p>
+          他人には知られたくない、知られては困る情報でも、覚えられないものは多くあります。そんな情報をどこかに保存する時、このページでシールドすれば、そのまま保存するより安全に保存することができます。
+          ファイル共有サービスを使ったり、自分自身へメールやで送信したりすれば、複数のパソコンやスマホで情報を見ることができます。
+        </p>
+      </li>
+      <li>
+        <p>最新の技術であなたの情報を保護</p>
+        <p>
+          SHA-256の10万回適用や128ビット認証付きAESといった最新の技術をすることで、あなたの情報を強力に守ります。さらに、メモをシールドするたびに、96ビットの乱数で結果をより複雑にします。
+          シールド済みのテキストを、安心して他のアプリやサービスに保存できます。
+        </p>
+      </li>
+      <li>
+        <p>プライバシーを漏らさない</p>
+        <p>合言葉とメモ自体を含め、あなたの情報を一切外部に送信しません。</p>
+      </li>
+      <li>
+        <p>半永久的</p>
+        <p>他のサービスや Web サイトへの依存は全くありません。パソコンないしはスマホ、OS、ブラウザ、このページさえあれば、他には何も必要ありません。</p>
+      </li>
+      <li>
+        <p>合言葉強度判定</p>
+        <p>あなたのメモを守る合言葉が簡単すぎないか、自動的に判定してお知らせします。64ビット相当の、十分に複雑な合言葉であれば、１秒に10万回も合言葉を憶測して試せる機械があっても、復元するのに平均で292万年かかる計算になります。</p>
+        <p>（2の64乗回 ÷ 10万回/秒 ÷ 2 (中央値)）＝（92兆秒）＝（292万年）</p>
+      </li>
+      <li>
+        <p>合言葉憶測防止</p>
+        <p>合言葉が少しでも正しく無い場合には、元のメモは一切生成できません。憶測された複数の合言葉の復元結果を比較して、どの憶測がより正しい合言葉に近いかどうか、結果から推測することはできません。</p>
+      </li>
+      <li>
+        <p>完全にオープン・ソース、誰でも検証可能</p>
+        <p>全ての暗号化の実装はこのページの中にありますし、アイコンも含めて<a href="https://github.com/YusukeBou/yusukebou.github.io/tree/main/NoteShield" target="_blank">全てのファイルが公開</a>されています。HTMLとJavaScriptに関する知識がある誰でも、このページの正しさを検証できます。さらに、<a href="#Test">何十ものテストが自動化</a>されており、技術者を全く必要としません。</p>
+      </li>
+    </ul>
+    <h3>使い方</h3>
+    <ul>
+      <li>
+        <p>このページを使う準備をする。</p>
+        <ol>
+          <li>信頼できるパソコンないしはスマホ、OS、ブラウザを準備する。</li>
+          <li>OSとブラウザをアップデートして最新にする。</li>
+          <li>このページをダウンロードして保存するか、アプリとしてインストールする。</li>
+        </ol>
+        <p>
+          このページは、それを開くパソコンやスマホ、OS、ブラウザの機能を利用します。
+          これらがあなたの情報を漏らしてしまったり、あなたのプライバシーを尊重してくれない場合、このページが情報を外部に送信しなくても、あなたの情報は守れません。
+        </p>
+        <p>
+          ネットにアクセスできない場合や、万が一このページがネットから無くなった時に備えて、このページをパソコンにダウンロードしておくと安心です。
+          あるいは、以下の手順で、パソコンやスマホにこのページをアプリとしてインストールしておくこともできます。
+        </p>
+        <ul>
+          <li>
+            <p>Windows PC の場合</p>
+            <ol>
+              <li>最新の <a href="microsoft-edge:https://yusukebou.github.io/NoteShield/NoteShield.html">Microsoft Edge でこのページを開く</a>。</li>
+              <li>右上の … ボタンを押してメニューを開き、「アプリ」から、「このサイトをアプリとしてインストール」を選択。</li>
+              <li>「インストール」ボタンをクリックすると、サイトがアプリとして開き、スタートメニューにも「Note Shield」アプリとして登録されます。</li>
+            </ol>
+          </li>
+          <li>
+            <p>iPhone / iPad の場合</p>
+            <ol>
+              <li>このページを最新の Safari で開く。</li>
+              <li>画面下端中央の共有ボタン（四角と上矢印の組み合わせ）をタップ。</li>
+              <li>「ホーム画面に追加」をタップ。</li>
+              <li>「追加」ボタンをタップすると、「Note Shield」アプリがホーム画面に追加されます。</li>
+            </ol>
+          </li>
+          <li>
+            <p>Android の場合</p>
+            <ol>
+              <li>このページを最新の Chrome で開く。</li>
+              <li>右上の：ボタンを押してメニューを開き、「アプリをインストール」を選択。</li>
+              <li>「インストール」ボタンをクリックすると、「Note Shield」アプリがスマホに追加されます。</li>
+            </ol>
+          </li>
+        </ul>
+      </li>
+      <li>
+        <p>メモをシールドする。</p>
+        <ol>
+          <li>「操作」で「シールド」が選択されていることを確認する。</li>
+          <li>「<span class="emoji-container">📝</span> メモ」にテキストを入力する。</li>
+          <li>
+            メモをシールドする合言葉を決めて、「<span class="emoji-container">🔑</span> 合言葉」に入力する。アルファベットの大文字、小文字、記号、数字を混ぜて、十分に長い複雑な合言葉を選ぶ。
+            人名、地名、辞書にある言葉をベースにせず、キーボードの並び順通りに文字を入力しない。
+            <p>
+              注意：<strong>合言葉が簡単すぎると</strong>、単純な合言葉を片っ端から試すことで、<strong>元のメモを他人に復元されてしまう恐れがあります</strong>。
+              また、合言葉を知っていれば、誰でも元のメモを復元することができます。<strong>合言葉は他の誰にも知られないようにしてください</strong>。
+            </p>
+          </li>
+          <li>
+            同じ合言葉を「もう一度入力して確認」に再度入力する。
+            <p>注意：<strong>合言葉を忘れてしまった場合、元のメモを復元することはできません</strong>。この入力欄で、キーボードの打ち間違いが無いか確認します。</p>
+          </li>
+          <li>「シールド」ボタンを押す。</li>
+          <li>「結果をクリップボードにコピー」ボタンを押して、「<span class="emoji-container">🛡</span> シールド済みテキスト」に表示されている結果をクリップボードにコピーする。</li>
+          <li>結果を保存したいアプリに移動して、クリップボードの内容を貼り付ける。</li>
+        </ol>
+      </li>
+      <li>
+        <p>シールド済みのテキストからメモを復元する。</p>
+        <ol>
+          <li>シールド済みのテキストを、保存したアプリからコピーする。</li>
+          <li>「操作」で「復元」が選択されていることを確認する。</li>
+          <li>「<span class="emoji-container">🛡</span> シールド済みテキスト」にクリップボードの内容を貼り付ける。</li>
+          <li>「<span class="emoji-container">🔑</span> 合言葉」に、元のメモをシールドした時に入力した合言葉を再度入力する。</li>
+          <li>「復元」ボタンを押す。</li>
+          <p>注意：<strong>合言葉を忘れてしまった場合、元のメモを復元することはできません</strong>。</p>
+        </ol>
+      </li>
+      <li>
+        <p>復元したメモを編集して再度シールドする。</p>
+        <ol>
+          <li>上の「シールド済みのテキストからメモを復元する」手順に従って、メモを復元する。</li>
+          <li>「メモを編集」ボタンを押す。ページが「シールド」操作に切り替わる。</li>
+          <li>「<span class="emoji-container">📝</span> メモ」の内容を編集する。</li>
+          <li>上の「メモをシールドする」手順に従って、メモを再度シールドする。</li>
+        </ol>
+      </li>
+    </ul>
+    <h3>よくある質問</h3>
+    <ul>
+      <li>
+        <p>なぜ合言葉が簡単だと問題なのですか。</p>
+        <p>暗号を破る最も基本的な方法は、可能な全てのパスワードを順番に試していくことです。簡単な合言葉は、「順番」の初めの方で現れてしまいます。その結果、簡単な合言葉を使ってシールドした結果は、より早く他人に復元されてしまいます。</p>
+      </li>
+      <li>
+        <p>知人に安全に情報を渡すために、このページは利用できますか。</p>
+        <p>このページは、合言葉を安全に他の人に知らせる方法は提供していません。もしも合言葉が第3者に漏れた場合、最悪の場合、元のメモの内容を誰でも知ることができるようになる可能性があります。</p>
+      </li>
+      <li>
+        <p>私のブラウザでこのページは動作しますか。</p>
+        <p>
+          <p>2021年1月時点でテスト済みのブラウザ、以下の通りです。</p>
+          <ul>
+            <li>Mozilla Firefox Version 84.0.1 (64-bit) for Windows</li>
+            <li>Google Chrome Version 87.0.4280.88 (64-bit) for Windows</li>
+            <li>Microsoft Edge Version 87.0.664.66 (64-bit) for Windows</li>
+            <li>Safari in iOS 14.3</li>
+            <li>Safari in iOS 12.5 for iPad</li>
+            <li>Mozilla Firefox Version 30.0 for iOS</li>
+            <li>Google Chrome Version 87.0.4280.77 for iOS</li>
+            <li>Microsoft Edge Version 45.11.11 for iOS</li>
+            <li>Google Chrome Version 87.0.4280.101 for Android</li>
+          </ul>
+        </p>
+      </li>
+      <li>
+        <p>合言葉を忘れてしまいました。元のメモの内容を復元する方法はないですか。</p>
+        <p>残念ながらありません。それがあれば、誰でもその方法を使って、元のメモの内容を復元を復元できてしまうためです。</p>
+      </li>
+    </ul>
+    <h3>要改善点</h3>
+    <ul>
+      <li>ページのデザインは、全く手つかずで、ブラウザのデフォルトの見た目のままです。</li>
+      <li>ページの言語は、日本語と英語のみです。</li>
+    </ul>
+    <p><a href="#License">License</a> セクションも参照してください。</p>
+    <h3>謝辞</h3>
+    <p>2020－2021年の冬の休暇シーズンに、PCゲームを少し我慢して、数日パソコンを貸してくれた娘に感謝します。ありがとう。</p>
+    <p>仕事でもないのに時間を使って、家事の手伝いをしなかった夫を許してくれた妻に感謝します。ありがとう。</p>
+    <p>そして、メモ帳アプリと Chromium Projects に感謝します。</p>
+    <p><a href="#" title="始めに戻る">始めに戻る</a></p>
+  </span>
+  <hr/>
+  <h2 id="Test"><a href="#Test">Test</a></h2>
+  <p><button onclick="testCryptoLogic(true)">Start Tests</button></p>
+  <span id="log"></span>
+  <hr/>
+  <span lang="en-US">
+    <h2 id="License"><a href="#License">License</a></h2>
+    <p>
+      <a href="https://www.linkedin.com/in/yusukebou/" target="_blank">Yusuke Bou</a>, the author, lisenses this software with the following license text known as <a href="https://opensource.org/licenses/MIT" target="_blank" title="MIT License">MIT License</a>.
+    </p>
+    <blockquote>
+      <p>Copyright (c) 2021 Yusuke Bou</p>
+      <p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+      <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+      <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+    </blockquote>
+    <p><a href="#" title="Back to top">Back to top</a></p>
+  </span>
+</body>
+</html>
