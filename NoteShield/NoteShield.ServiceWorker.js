@@ -1,10 +1,14 @@
+"use strict";
+
 function resolvablePromise() {
-  this.resolve = undefined;
-  this.reject = undefined;
+  let resolve = undefined;
+  let reject = undefined;
   this.promise = new Promise(function(resolutionFunc, rejectionFunc){
-    this.resolve = resolutionFunc;
-    this.reject = rejectionFunc;
+    resolve = resolutionFunc;
+    reject = rejectionFunc;
   });
+  this.resolve = resolve;
+  this.reject = reject;
 }
 
 const jsonCacheName = "NoteShieldJson";
@@ -42,7 +46,7 @@ function getJsonAsync() {
       }
     })();
   }
-  return jsonPromise;
+  return jsonPromise.promise;
 }
 
 async function getCacheNameAsync() {
