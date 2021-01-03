@@ -10,7 +10,7 @@ function resolvablePromise() {
 const jsonCacheName = "NoteShieldJson";
 const jsonFile = "/NoteShield/NoteShield.json";
 
-const jsonPromise = null;
+let jsonPromise = null;
 function getJsonAsync() {
   if (!jsonPromise) {
     jsonPromise = new resolvablePromise();
