@@ -74,9 +74,9 @@ self.addEventListener("install", function(event) {
 self.addEventListener("activate", function(event){
   event.waitUntil((async function(){
     const currentCacheName = await getCacheNameAsync();
+    const cachedNames = await self.caches.keys();
     await Promise.all(
-      (await self.caches.keys())
-        .filter((cacheName) => (cacheName !== jsonCacheName && cacheName !== currentCacheName))
+      cachedNames.filter((cacheName) => (cacheName !== jsonCacheName && cacheName !== currentCacheName))
         .map((cacheName) => (self.caches.delete(cacheName))));
   })());
 });
