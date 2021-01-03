@@ -24,9 +24,10 @@ function getJsonAsync() {
       // First try online.
       try {
         const jsonResponse = await self.fetch(jsonFile);
+        const responseClone = jsonResponse.clone();
         const json = await jsonResponse.json();
         const jsonCache = await self.caches.open(jsonCacheName);
-        await jsonCache.put(jsonFile, jsonResponse.clone());
+        await jsonCache.put(jsonFile, responseClone);
         jsonPromise.resolve(json);
         lastJsonFetch = now;
       } catch (errorOnline) {
