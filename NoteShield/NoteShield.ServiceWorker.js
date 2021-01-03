@@ -75,9 +75,10 @@ self.addEventListener("activate", function(event){
   event.waitUntil((async function(){
     const currentCacheName = await getCacheNameAsync();
     const cachedNames = await self.caches.keys();
-    await Promise.all(
-      cachedNames.filter((cacheName) => (cacheName !== jsonCacheName && cacheName !== currentCacheName))
-        .map((cacheName) => (self.caches.delete(cacheName))));
+    const obsoluteCachedNames = cachedNames.filter((cacheName) => (cacheName !== jsonCacheName && cacheName !== currentCacheName));
+    if (obsoluteCachedNames.length > 0) {
+      await Promise.all(obsoluteCachedNames.map((cacheName) => (self.caches.delete(cacheName))));
+    }
   })());
 });
 
