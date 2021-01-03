@@ -20,6 +20,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
 <link rel="shortcut icon" href="NoteShield.64x64.png" type="image/png">
+<link rel="icon" href="NoteShield.64x64.png" sizes="64x64">
+<link rel="icon" href="NoteShield.120x120.png" sizes="120x120">
+<link rel="icon" href="NoteShield.180x180.png" sizes="180x180">
+<link rel="apple-touch-icon" href="NoteShield.64x64.png" sizes="64x64">
+<link rel="apple-touch-icon" href="NoteShield.120x120.png" sizes="120x120">
+<link rel="apple-touch-icon" href="NoteShield.180x180.png" sizes="180x180">
 
 <link rel="manifest" href="NoteShield.webmanifest">
 
@@ -916,7 +922,7 @@ const resources = {
   },
 
   "ja": {
-    title: "メモ シールド",
+    title: "メモ シールド (Note Shield)",
     description: "このページでは、メモを暗号用の合言葉でシールド（保護）して読めないテキストにしたり、それを復元したりできます。合言葉を知らないと、元のメモは復元できません。あなたのパソコンやスマホから外部にメモの内容や合言葉が送られることはありません。",
     detailsLinkText: "詳細...",
     languageSelectorLabel: "ページの言語：",
@@ -1156,7 +1162,11 @@ input[type="password"], .input-hider {
       </li>
       <li>
         <p>100% open-source; anyone can verify</p>
-        <p>All the implementation is within this page. Anyone with HTML and JavaScript knowledge can verify the page correctness. Moreover, <a href="#Test">dozens of test cases are automated</a> to require no engineer.</p>
+        <p>
+          All the encryption implementation is within this page and
+          <a href="https://github.com/YusukeBou/yusukebou.github.io/tree/main/NoteShield" target="_blank">all the pages are published</a>, even including icons.
+          Anyone with HTML and JavaScript knowledge can verify the page correctness. Moreover, <a href="#Test">dozens of test cases are automated</a> to require no engineer.
+        </p>
       </li>
     </ul>
     <h3>Usage</h3>
@@ -1166,15 +1176,34 @@ input[type="password"], .input-hider {
         <ol>
           <li>Get a PC or smart phone, OS, and a browser that you can trust.</li>
           <li>Update OS and the browser to the latest.</li>
-          <li>Download and save this page.</li>
+          <li>Download and save this page or install this page as an app.</li>
         </ol>
         <p>
           This page depends on PC or smart phone, OS, and the browser.
           If these would leak your information or would not honor your privacy, then your information is not secure even if this page does not send any information to outside by itself.
         </p>
         <p>
-          To be prepared for the case the network would become unavailable or the page would be deleted from the Internet, save this page to your PC.
+          To be prepared for the case the network would become unavailable or the page would be deleted from the Internet, save this page to your PC or install the page as an app.
         </p>
+        <ul>
+          <li>
+            <p>Windows PC</p>
+            <ol>
+              <li><a href="microsoft-edge:https://yusukebou.github.io/NoteShield/NoteShield.html">Open this page with Microsoft Edge</a> after updating it to the latest.</li>
+              <li>Open menu from … button at around right-top corner, select "Apps" and "Install this site as an app".</li>
+              <li>Click "Install" button to get "Note Shield" app opened instead of a web page. The app is also added to Start menu.</li>
+            </ol>
+          </li>
+          <li>
+            <p>iPhone / iPad</p>
+            <ol>
+              <li>Open this page with the latest Safari browser.</li>
+              <li>Tap on Share button (box with up-arrow) at the bottom center of the browser.</li>
+              <li>Tap "Add to Home Screen".</li>
+              <li>Tap "Add" button to get "Note Shield" app icon on your home screen.</li>
+            </ol>
+          </li>
+        </ul>
       </li>
       <li>
         <p>Shield your note.</p>
@@ -1303,7 +1332,7 @@ input[type="password"], .input-hider {
       </li>
       <li>
         <p>完全にオープン・ソース、誰でも検証可能</p>
-        <p>全ての実装はこのページの中にあります。HTMLとJavaScriptに関する知識がある誰でも、このページの正しさを検証できます。さらに、<a href="#Test">何十ものテストが自動化</a>されており、技術者を全く必要としません。</p>
+        <p>全ての暗号化の実装はこのページの中にありますし、アイコンも含めて<a href="https://github.com/YusukeBou/yusukebou.github.io/tree/main/NoteShield" target="_blank">全てのファイルが公開</a>されています。HTMLとJavaScriptに関する知識がある誰でも、このページの正しさを検証できます。さらに、<a href="#Test">何十ものテストが自動化</a>されており、技術者を全く必要としません。</p>
       </li>
     </ul>
     <h3>使い方</h3>
@@ -1313,15 +1342,35 @@ input[type="password"], .input-hider {
         <ol>
           <li>信頼できるパソコンないしはスマホ、OS、ブラウザを準備する。</li>
           <li>OSとブラウザをアップデートして最新にする。</li>
-          <li>このページをダウンロードして保存する。</li>
+          <li>このページをダウンロードして保存するか、アプリとしてインストールする。</li>
         </ol>
         <p>
           このページは、それを開くパソコンやスマホ、OS、ブラウザの機能を利用します。
           これらがあなたの情報を漏らしてしまったり、あなたのプライバシーを尊重してくれない場合、このページが情報を外部に送信しなくても、あなたの情報は守れません。
         </p>
         <p>
-          ネットにアクセスできない場合や、万が一このページがネットから無くなった時に備えて、パソコンにページを保存しておくと安心です。
+          ネットにアクセスできない場合や、万が一このページがネットから無くなった時に備えて、このページをパソコンにダウンロードしておくと安心です。
+          あるいは、以下の手順で、パソコンやスマホにこのページをアプリとしてインストールしておくこともできます。
         </p>
+        <ul>
+          <li>
+            <p>Windows PC の場合</p>
+            <ol>
+              <li>最新の <a href="microsoft-edge:https://yusukebou.github.io/NoteShield/NoteShield.html">Microsoft Edge でこのページを開く</a>。</li>
+              <li>右上の … ボタンを押してメニューを開き、「アプリ」から、「このサイトをアプリとしてインストール」を選択。</li>
+              <li>「インストール」ボタンをクリックすると、サイトがアプリとして開き、スタートメニューにも「Note Shield」アプリとして登録されます。</li>
+            </ol>
+          </li>
+          <li>
+            <p>iPhone / iPad の場合</p>
+            <ol>
+              <li>このページを最新の Safari で開く。</li>
+              <li>画面下端中央の共有ボタン（四角と上矢印の組み合わせ）をタップ。</li>
+              <li>「ホーム画面に追加」をタップ。</li>
+              <li>「追加」ボタンをタップすると、「Note Shield」アプリがホーム画面に追加されます。</li>
+            </ol>
+          </li>
+        </ul>
       </li>
       <li>
         <p>メモをシールドする。</p>

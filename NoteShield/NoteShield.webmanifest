@@ -7,6 +7,16 @@
       "src": "NoteShield.64x64.png",
       "sizes": "64x64",
       "type": "image/png"
+    },
+    {
+      "src": "NoteShield.120x120.png",
+      "sizes": "120x120",
+      "type": "image/png"
+    },
+    {
+      "src": "NoteShield.180x180.png",
+      "sizes": "180x180",
+      "type": "image/png"
     }
   ],
   "start_url": "NoteShield.html",
