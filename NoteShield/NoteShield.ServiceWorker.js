@@ -87,7 +87,7 @@ self.addEventListener("fetch", function(event) {
   } else {
     event.respondWith((async function(){
       // First try cache.
-      const cachedResponse = await self.caches.match(event.request);
+      const cachedResponse = await self.caches.match(event.request, { ignoreSearch: true });
       if (cachedResponse) {
         return cachedResponse;
       }

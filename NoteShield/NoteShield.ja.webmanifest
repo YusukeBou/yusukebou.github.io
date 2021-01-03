@@ -1,0 +1,26 @@
+{
+  "name": "メモ シールド",
+  "short_name": "メモ シールド",
+  "description": "このページでは、メモを暗号用の合言葉でシールド（保護）して読めないテキストにしたり、それを復元したりできます。合言葉を知らないと、元のメモは復元できません。あなたのパソコンやスマホから外部にメモの内容や合言葉が送られることはありません。",
+  "icons": [
+    {
+      "src": "NoteShield.64x64.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
+    {
+      "src": "NoteShield.120x120.png",
+      "sizes": "120x120",
+      "type": "image/png"
+    },
+    {
+      "src": "NoteShield.180x180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "NoteShield.html?l=ja",
+  "display": "fullscreen",
+  "theme_color": "#808080",
+  "background_color": "#808080"
+}

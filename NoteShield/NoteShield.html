@@ -27,9 +27,6 @@
 <link rel="apple-touch-icon" href="NoteShield.120x120.png" sizes="120x120">
 <link rel="apple-touch-icon" href="NoteShield.180x180.png" sizes="180x180">
 
-<!-- In case of local-copy (file:// protocol) scenario, the below may fail. -->
-<link rel="manifest" href="NoteShield.webmanifest">
-
 <script type="text/javascript">
 "use strict";
 
@@ -604,6 +601,14 @@ const viewModel = (function() {
       }
     }
 
+    function appendLanguageManifest(){
+      const currentLanguage = getCurrentLanguage();
+      const linkElement = document.createElement("link");
+      linkElement.rel = "manifest";
+      linkElement.href = `NoteShield.${currentLanguage}.webmanifest`;
+      document.head.appendChild(linkElement);
+    };
+
     function initializeInputHider() {
       // When more than one password input field exist in one page, Safari on iOS 13.4 freezes longer than a minute when the user touches on the second field.
       // Working around it by reusing the same input, and present the pseudo element at the originally deired place.
@@ -667,6 +672,7 @@ const viewModel = (function() {
       applyResource();
       buildLanguageSelector();
       setCryptoLogicErrorMessages();
+      appendLanguageManifest();
     };
     window.addEventListener("DOMContentLoaded", this.DOMContentLoaded.bind(this));
 
