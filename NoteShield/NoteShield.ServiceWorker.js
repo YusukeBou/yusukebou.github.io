@@ -54,6 +54,15 @@ async function getCacheNameAsync() {
   return `NoteShieldV${json.version}`;
 }
 
+async function purgeObsoleteCaches() {
+  const currentCacheName = await getCacheNameAsync();
+  const cachedNames = await self.caches.keys();
+  const obsoluteCachedNames = cachedNames.filter((cacheName) => (cacheName !== jsonCacheName && cacheName !== currentCacheName));
+  if (obsoluteCachedNames.length > 0) {
+    await Promise.all(obsoluteCachedNames.map((cacheName) => (self.caches.delete(cacheName))));
+  }
+}
+
 const appFiles = [
   "/NoteShield/NoteShield.html",
   "/NoteShield/NoteShield.64x64.png",
@@ -72,14 +81,7 @@ self.addEventListener("install", function(event) {
 });
 
 self.addEventListener("activate", function(event){
-  event.waitUntil((async function(){
-    const currentCacheName = await getCacheNameAsync();
-    const cachedNames = await self.caches.keys();
-    const obsoluteCachedNames = cachedNames.filter((cacheName) => (cacheName !== jsonCacheName && cacheName !== currentCacheName));
-    if (obsoluteCachedNames.length > 0) {
-      await Promise.all(obsoluteCachedNames.map((cacheName) => (self.caches.delete(cacheName))));
-    }
-  })());
+  event.waitUntil(purgeObsoleteCaches());
 });
 
 self.addEventListener("fetch", function(event) {
@@ -87,7 +89,10 @@ self.addEventListener("fetch", function(event) {
     event.respondWith(getJsonAsync());
   } else {
     event.respondWith((async function(){
-      // First try cache.
+      // First clear obsolete caches.
+      await purgeObsoleteCaches()();
+
+      // Then try the still valid caches.
       const cachedResponse = await self.caches.match(event.request, { ignoreSearch: true });
       if (cachedResponse) {
         return cachedResponse;
