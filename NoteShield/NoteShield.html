@@ -959,9 +959,12 @@ const resources = {
 // Arabic or Hebrew may need Right-to-Left support with "DIR" attribute in BODY element.
 // Supporting language regions may need code changes as well.
 
-// Progressive web app service worker registration.
+// Progressive web app service worker registration. For now, always try to update.
 if (navigator.serviceWorker) {
-  navigator.serviceWorker.register("NoteShield.ServiceWorker.js");
+  (async function(){
+    const serviceWorkerRegistration = await navigator.serviceWorker.register("NoteShield.ServiceWorker.js");
+    serviceWorkerRegistration.update();
+  })();
 }
 </script>
 <!-- TODO: need a designer for the UI design polish... -->

@@ -71,6 +71,16 @@ self.addEventListener("install", function(event) {
   })());
 });
 
+self.addEventListener("activate", function(event){
+  event.waitUntil((async function(){
+    const currentCacheName = await getCacheNameAsync();
+    await Promise.all(
+      (await self.caches.keys())
+        .filter((cacheName) => (cacheName !== jsonCacheName && cacheName !== currentCacheName))
+        .map((cacheName) => (self.caches.delete(cacheName))));
+  })());
+});
+
 self.addEventListener("fetch", function(event) {
   if (event.request.url === jsonFile) {
     event.respondWith(getJsonAsync());
