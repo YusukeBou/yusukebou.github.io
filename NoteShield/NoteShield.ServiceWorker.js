@@ -10,8 +10,14 @@ function resolvablePromise() {
 const jsonCacheName = "NoteShieldJson";
 const jsonFile = "/NoteShield/NoteShield.json";
 
+const jsonFetchPeriodInMilliSec = 60000; // 1 minute
+let lastJsonFetch = null;
 let jsonPromise = null;
 function getJsonAsync() {
+  const now = new Date();
+  if (!lastJsonFetch || now.valueOf() - lastJsonFetch.valueOf() > jsonFetchPeriodInMilliSec) {
+    jsonPromise = null;
+  }
   if (!jsonPromise) {
     jsonPromise = new resolvablePromise();
     (async function(){
@@ -20,8 +26,9 @@ function getJsonAsync() {
         const jsonResponse = await self.fetch(jsonFile);
         const json = await jsonResponse.json();
         const jsonCache = await self.caches.open(jsonCacheName);
-        await cache.put(jsonFile, jsonResponse.clone());
+        await jsonCache.put(jsonFile, jsonResponse.clone());
         jsonPromise.resolve(json);
+        lastJsonFetch = now;
       } catch (errorOnline) {
         // Next try cache.
         try {
