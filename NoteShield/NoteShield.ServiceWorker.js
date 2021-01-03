@@ -90,7 +90,7 @@ self.addEventListener("fetch", function(event) {
   } else {
     event.respondWith((async function(){
       // First clear obsolete caches.
-      await purgeObsoleteCaches()();
+      await purgeObsoleteCaches();
 
       // Then try the still valid caches.
       const cachedResponse = await self.caches.match(event.request, { ignoreSearch: true });
