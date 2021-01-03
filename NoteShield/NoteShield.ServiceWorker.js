@@ -57,7 +57,7 @@ self.addEventListener("install", function(event) {
     const cache = await self.caches.open(cacheName);
     await cache.addAll(appFiles);
   })());
-}
+});
 
 self.addEventListener("fetch", function(event) {
   if (event.request.url === jsonFile) {
