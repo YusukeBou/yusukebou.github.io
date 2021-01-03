@@ -25,7 +25,7 @@ function getJsonAsync() {
       } catch (errorOnline) {
         // Next try cache.
         try {
-          await cachedResponse = self.caches.match(jsonFile);
+          cachedResponse = await self.caches.match(jsonFile);
           const json = await cachedResponse.json();
           jsonPromise.resolve(json);
         } catch (errorCache) {
