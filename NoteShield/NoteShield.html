@@ -557,7 +557,7 @@ const viewModel = (function() {
   }
 
   function stringifyError(error) {
-    if (error && error instanceof DOMException) {
+    if (error && error instanceof DOMException && error.name === "OperationError") {
       return getResource("decodingErrorMessage").replace("${0}", error.toString());
     } if (error && typeof error.toString === "function") {
       return error.toString();
@@ -835,6 +835,9 @@ const viewModel = (function() {
           url: pageUrl,
         });
       } catch (error) {
+        if (error && error instanceof DOMException && error.name === "AbortError") {
+          return; // The user aborting the share pane is not an error.
+        }
         elements.shareResultMessage.innerText = stringifyError(error);
       }
     };
