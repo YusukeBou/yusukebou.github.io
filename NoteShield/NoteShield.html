@@ -517,6 +517,9 @@ const viewModel = (function() {
         encodeResultMessage: document.getElementById("encode-result-message"),
         decodeResultMessage: document.getElementById("decode-result-message"),
         copyResultMessage: document.getElementById("copy-result-message"),
+        copyUrlResultMessage: document.getElementById("copy-url-result-message"),
+        shareResultMessage: document.getElementById("share-result-message"),
+        shareButtonContainer: document.getElementById("share-button-container"),
       };
     }
     return pageElements;
@@ -673,6 +676,8 @@ const viewModel = (function() {
       buildLanguageSelector();
       setCryptoLogicErrorMessages();
       appendLanguageManifest();
+
+      this.initializeShareButton();
     };
     window.addEventListener("DOMContentLoaded", this.DOMContentLoaded.bind(this));
 
@@ -687,8 +692,8 @@ const viewModel = (function() {
       window.location.replace(`?l=${elements.languageSelector.value}`);
     };
 
-    this.onDetailsLinkClick = function() {
-      window.location.replace(`#Details-${getCurrentLanguage()}`); // TODO: when adding more languages, put a fallback logic here in case details are not available.
+    this.onDetailsLinkClick = function(anchorBase) {
+      window.location.replace(`#${anchorBase}-${getCurrentLanguage()}`); // TODO: when adding more languages, put a fallback logic here in case details are not available.
     };
 
     this.onEncodeDecodeRadioChanged = function() {
@@ -701,6 +706,9 @@ const viewModel = (function() {
       (elements.encodeRadio.checked ? elements.encoded : elements.decoded).value = "";
 
       elements.copyResultMessage.innerText = "";
+
+      elements.copyUrlResultMessage.innerText = "";
+      elements.shareResultMessage.innerText = "";
     };
 
     async function convert(toEncode, sourceTextArea, targetTextArea, resultElement, phraseInput, retypeInput) {
@@ -756,7 +764,10 @@ const viewModel = (function() {
       }
       elements.decoded.value = "";
       elements.decodeResultMessage.innerText = "";
+
       elements.copyResultMessage.innerText = "";
+      elements.copyUrlResultMessage.innerText = "";
+      elements.shareResultMessage.innerText = "";
     };
 
     this.onEditButtonPressed = function () {
@@ -777,9 +788,7 @@ const viewModel = (function() {
       elements.encoded.setSelectionRange(0, elements.encoded.value.length);
     };
 
-    this.copyResultButtonPressed = async function() {
-      const elements = getPageElements();
-      let resultMessage = "";
+    this.copyTextAndReturnMessageToUser = async function(text) {
       try {
         let clipboardWritePermissionState = "";
         try {
@@ -790,14 +799,43 @@ const viewModel = (function() {
           throw new Error(getResource("clipboardWriteAccessNotAllowedErrorMessage"));
         }
 
-        const resultTextArea = elements.encodeRadio.checked ? elements.encoded : elements.decoded;
-        const result = resultTextArea.value;
-        await navigator.clipboard.writeText(result);
-        resultMessage = getResource("clipboardWriteSuccessMessage");
+        await navigator.clipboard.writeText(text);
       } catch (error) {
-        resultMessage = stringifyError(error);
-      } finally {
-        elements.copyResultMessage.innerText = resultMessage;
+        return stringifyError(error);
+      }
+      return getResource("clipboardWriteSuccessMessage");
+    };
+
+    this.copyResultButtonPressed = async function() {
+      const elements = getPageElements();
+      const resultTextArea = elements.encodeRadio.checked ? elements.encoded : elements.decoded;
+      elements.copyResultMessage.innerText = await this.copyTextAndReturnMessageToUser(resultTextArea.value);
+    };
+
+    const pageUrl = "https://yusukebou.github.io/NoteShield/NoteShield.html"; // TODO: inject this into DOM instead of hard-coding it there.
+    this.onCopySiteUrlButtonPressed = async function() {
+      const elements = getPageElements();
+      elements.copyUrlResultMessage.innerText = await this.copyTextAndReturnMessageToUser(pageUrl);
+    };
+
+    this.initializeShareButton = function() {
+      const elements = getPageElements();
+      const canShare = !!navigator.share;
+      elements.shareButtonContainer.style.setProperty("display", canShare ? "list-item" : "none");
+    };
+
+    this.onShareButtonPressed = async function() {
+      const elements = getPageElements();
+      elements.shareResultMessage.innerText = "";
+      try {
+        const title = getResource("title");
+        await navigator.share({
+          title,
+          text: title,
+          url: pageUrl,
+        });
+      } catch (error) {
+        elements.shareResultMessage.innerText = stringifyError(error);
       }
     };
 
@@ -915,14 +953,29 @@ const resources = {
     editPlainTextButtonLabel: "Edit Note",
     _comment_editPlainTextButtonLabel: "Button to copy the decoded text to the editable text field so that the user can start modifing and encoding it again.",
 
+    afterActionSectionLabelText: "Before Leaving:",
+    _comment_afterActionSectionLabelText: "Name of the section after the main actions, including copying the result, copying the link to this page, installing as a web app, and sharing link.",
+
     copyResultButtonLabel: "Copy Result to Clipboard",
     _comment_copyResultButtonLabel: "Button to copy the decoded text to the clipboard.",
 
+    copySiteUrlButtonLabel: "Copy Page Address to Clipboard",
+    _comment_copySiteUrlButtonLabel: "Button to copy the page URL.",
+
     clipboardWriteSuccessMessage: "Copied.",
-    _comment_clipboardWriteSuccessMessage: "The user pressed the copy-result button and no error is discovered. Without the message, it looks like the button-press did nothing.",
+    _comment_clipboardWriteSuccessMessage: "The user pressed the copy-result or copy-URL button and no error is discovered. Without the message, it looks like the button-press did nothing.",
 
     clipboardWriteAccessNotAllowedErrorMessage: "The browser does not permit the page to change the clipboard. Click on the result text field and copy there.",
-    _comment_clipboardWriteAccessNotAllowedErrorMessage: "The user pressed the copy-result button but the browser returned the permission error while accessing to the clipboard.",
+    _comment_clipboardWriteAccessNotAllowedErrorMessage: "The user pressed the copy-result or copy-URL button but the browser returned the permission error while accessing to the clipboard.",
+
+    installLinkText: "Download and Intall the Page as Web App",
+    _comment_installLinkText: "Link to the document that describes how to setup this page locally.",
+
+    siteUrlLabelLabel: "Page Address:",
+    _comment_siteUrlLabelLabel: "Label right before the URL to the page itself.",
+
+    shareButtonLabel: "Send the Page Address",
+    _comment_shareButtonLabel: "Button to open Share panel of the browser.",
 
     subtleNotFoundErrorMessage: "Web Crypto library is not found. The browser may be too old or the file could be from HTTP (non-HTTPS) server.",
     _comment_subtleNotFoundErrorMessage: "window.crypto.subtle is not found.",
@@ -959,9 +1012,14 @@ const resources = {
     encodingPhraseRecommendationMessage: "地名、人名、辞書にある単語を使ったり、キーボードの並びに通りにキーを押すのは避けましょう。",
     decodingErrorMessage: "合言葉を再度確認してください。ブラウザが次のエラーを返しました。「${0}」",
     editPlainTextButtonLabel: "メモを編集",
+    afterActionSectionLabelText: "最後に：",
     copyResultButtonLabel: "結果をクリップボードにコピー",
+    copySiteUrlButtonLabel: "このページのアドレスをクリップボードにコピー",
     clipboardWriteSuccessMessage: "コピーされました。",
     clipboardWriteAccessNotAllowedErrorMessage: "ブラウザが、このページのクリップボードへの操作を拒否しました。結果のテキストをクリックして、そこでコピーしてください。",
+    installLinkText: "ページをダウンロードしてアプリとしてインストール",
+    siteUrlLabelLabel: "ページのアドレス：",
+    shareButtonLabel: "ページのアドレスを送る",
     subtleNotFoundErrorMessage: "Web Crypto ライブラリが見つかりません。ブラウザが古すぎるか、ファイルがHTTPSではなくHTTPのサーバーにある可能性があります。",
     getRandomValuesNotFoundErrorMessage: "Web Crypto 乱数関数が見つかりません。ブラウザが古すぎます。",
     unknownErrorMessage: "未知のエラー",
@@ -1050,19 +1108,33 @@ input[type="password"], .input-hider {
     </h1>
     <p>
       <span data-resource-id="description" data-resource-target="innerText"></span>
-      <a data-resource-id="detailsLinkText" data-resource-target="innerText" onclick="viewModel.onDetailsLinkClick()" href="javascript:"></a>
+      <a data-resource-id="detailsLinkText" data-resource-target="innerText" onclick="viewModel.onDetailsLinkClick('Details')" href="javascript:"></a>
     </p>
-    <p>
-      <label for="language-selector">
-        <span class="emoji-container">🌐</span>
-        <span data-resource-id="languageSelectorLabel" data-resource-target="innerText"></span>
-      </label>
-      <select id="language-selector" oninput="viewModel.onLanguageSelectorInput()"></select>
+    <p dir="rtl"><!-- quick hack for right-alignment... fix when adopting to an RTL language -->
+      <span dir="ltr">
+        <label for="language-selector">
+          <span class="emoji-container">🌐</span>
+          <span data-resource-id="languageSelectorLabel" data-resource-target="innerText"></span>
+        </label>
+        <select id="language-selector" oninput="viewModel.onLanguageSelectorInput()"></select>
+      </span>
     </p>
     <p style="cursor:default;"><!-- Spaces around the radio inputs may flicker the mouse cursor as the user hovers over around these elements. -->
-      <label><span data-resource-id="actionRadioGroupLabel" data-resource-target="innerText"></span></label>
-      <input type="radio" id="encode-radio" name="conversion-direction" value="encode" data-resource-id="encodeRadioLabel" data-resource-target="aria-label" onchange="viewModel.onEncodeDecodeRadioChanged()"/><label for="encode-radio" data-resource-id="encodeRadioLabel" data-resource-target="innerText"></label>
-      <input type="radio" id="decode-radio" name="conversion-direction" value="decode" data-resource-id="decodeRadioLabel" data-resource-target="aria-label" onchange="viewModel.onEncodeDecodeRadioChanged()"/><label for="decode-radio" data-resource-id="decodeRadioLabel" data-resource-target="innerText"></label>
+      <div><label><span data-resource-id="actionRadioGroupLabel" data-resource-target="innerText"></span></label></div>
+      <div>
+        <input type="radio" id="encode-radio" name="conversion-direction" value="encode" data-resource-id="encodeRadioLabel" data-resource-target="aria-label" onchange="viewModel.onEncodeDecodeRadioChanged()"/>
+        <label for="encode-radio">
+          <span class="emoji-container">🛡</span>
+          <span data-resource-id="encodeRadioLabel" data-resource-target="innerText"></span>
+        </label>
+      </div>
+      <div>
+        <input type="radio" id="decode-radio" name="conversion-direction" value="decode" data-resource-id="decodeRadioLabel" data-resource-target="aria-label" onchange="viewModel.onEncodeDecodeRadioChanged()"/>
+        <label for="decode-radio">
+          <span class="emoji-container">🗡️</span>
+          <span data-resource-id="decodeRadioLabel" data-resource-target="innerText"></span>
+        </label>
+      </div>
     </p>
     <div id="encoding-container">
       <p>
@@ -1093,13 +1165,18 @@ input[type="password"], .input-hider {
         <span id="phrase-evaluation"></span>
         <span data-resource-id="encodingPhraseRecommendationMessage" data-resource-target="innerText"></span>
       </p>
-      <div><button data-resource-id="encodeButtonLabel" data-resource-target="innerText,aria-label" onclick="viewModel.onEncodeButtonPressed()"></button></div>
+      <div>
+        <button data-resource-id="encodeButtonLabel" data-resource-target="aria-label" onclick="viewModel.onEncodeButtonPressed()">
+          <span class="emoji-container">🛡</span>
+          <span data-resource-id="encodeButtonLabel" data-resource-target="innerText"></span>
+        </button>
+      </div>
       <p><span id="encode-result-message" class="message-area"></span></p>
     </div>
     <p>
       <div>
         <label for="encoded">
-          <span class="emoji-container">🛡</span>
+          <span class="emoji-container">🔒</span>
           <span data-resource-id="encodedTextAreaLabel" data-resource-target="innerText"></span>
         </label>
       </div>
@@ -1115,7 +1192,10 @@ input[type="password"], .input-hider {
           <span data-resource-id="phraseForDecodingTextBoxLabel" data-resource-target="innerText"></span>
         </label>
         <span id="phrase-decode-hider" class="input-hider" data-for="phrase-decode" tabindex="0"><span></span></span>
-        <button data-resource-id="decodeButtonLabel" data-resource-target="innerText,aria-label" onclick="viewModel.onDecodeButtonPressed()"></button>
+        <button data-resource-id="decodeButtonLabel" data-resource-target="aria-label" onclick="viewModel.onDecodeButtonPressed()">
+          <span class="emoji-container">🗡️</span>
+          <span data-resource-id="decodeButtonLabel" data-resource-target="innerText"></span>
+        </button>
       </p>
       <p><span id="decode-result-message" class="message-area"></span></p>
       <p>
@@ -1130,11 +1210,60 @@ input[type="password"], .input-hider {
           <textarea id="decoded" rows="10" data-resource-id="decodedTextAreaLabel" data-resource-target="aria-label"></textarea>
         </div>
       </p>
-      <p><button data-resource-id="editPlainTextButtonLabel" data-resource-target="innerText,aria-label" onclick="viewModel.onEditButtonPressed()"></button></p>
+      <p>
+        <button data-resource-id="editPlainTextButtonLabel" data-resource-target="aria-label" onclick="viewModel.onEditButtonPressed()">
+          <span>🖊</span>
+          <span data-resource-id="editPlainTextButtonLabel" data-resource-target="innerText,aria-label"></span>
+        </button>
+      </p>
     </div>
     <p>
-      <button data-resource-id="copyResultButtonLabel" data-resource-target="innerText,aria-label" onclick="viewModel.copyResultButtonPressed()">Copy Result</button>
-      <span id="copy-result-message"></span>
+      <div>
+        <span class="emoji-container">🛫</span>
+        <span data-resource-id="afterActionSectionLabelText" data-resource-target="innerText" ></span>
+      </div>
+      <ul>
+        <li>
+          <p>
+            <button data-resource-id="copyResultButtonLabel" data-resource-target="aria-label" onclick="viewModel.copyResultButtonPressed()">
+              <span class="emoji-container">📋</span>
+              <span data-resource-id="copyResultButtonLabel" data-resource-target="innerText" ></span>
+            </button>
+            <span id="copy-result-message"></span>
+          </p>
+        </li>
+        <li>
+          <p>
+            <a href="javascript:" onclick="viewModel.onDetailsLinkClick('Details-usage-prep')">
+              <span class="emoji-container">📥</span>
+              <span data-resource-id="installLinkText" data-resource-target="innerText" ></span>
+            </a>
+          </p>
+        </li>
+        <li>
+          <p>
+            <span class="emoji-container">🔗</span>
+            <span data-resource-id="siteUrlLabelLabel" data-resource-target="innerText"></span>
+            <a href="https://yusukebou.github.io/NoteShield/NoteShield.html">https://yusukebou.github.io/NoteShield/NoteShield.html</a>
+          </p>
+          <p>
+            <button data-resource-id="copySiteUrlButtonLabel" data-resource-target="aria-label" onclick="viewModel.onCopySiteUrlButtonPressed()">
+              <span class="emoji-container">📋</span>
+              <span data-resource-id="copySiteUrlButtonLabel" data-resource-target="innerText" ></span>
+            </button>
+            <span id="copy-url-result-message"></span>
+          </p>
+        </li>
+        <li id="share-button-container" style="display:none;">
+          <p>
+            <button data-resource-id="shareButtonLabel" data-resource-target="aria-label" onclick="viewModel.onShareButtonPressed()">
+              <span class="emoji-container">📤</span>
+              <span data-resource-id="shareButtonLabel" data-resource-target="innerText" ></span>
+            </button>
+            <span id="share-result-message" class="message-area"></span>
+          </p>
+        </li>
+      </ul>
     </p>
     <div style="display:none;">
       <input id="phrase-input" type="password" autocomplete="off" oninput="viewModel.onPhraseInput()"/>
@@ -1191,11 +1320,12 @@ input[type="password"], .input-hider {
     <h3>Usage</h3>
     <ul>
       <li>
-        <p>Prepare to use this page.</p>
+        <p id="Details-usage-prep-en">Prepare to use this page.</p>
         <ol>
           <li>Get a PC or smart phone, OS, and a browser that you can trust.</li>
           <li>Update OS and the browser to the latest.</li>
           <li>Download and save this page or install this page as an app.</li>
+          <li>Send the address of this page to your other devices so that you can recover your note on any of them.</li>
         </ol>
         <p>
           This page depends on PC or smart phone, OS, and the browser.
@@ -1235,7 +1365,7 @@ input[type="password"], .input-hider {
       <li>
         <p>Shield your note.</p>
         <ol>
-          <li>Ensure "Operation" has "Shield" selected.</li>
+          <li>Ensure "Operation" has "<span class="emoji-container">🛡</span> Shield" selected.</li>
           <li>Input your note to "<span class="emoji-container">📝</span> Note".</li>
           <li>
             Decide the pass-phrase to Shield your note and type it into "<span class="emoji-container">🔑</span> Pass-Phrase".
@@ -1250,21 +1380,23 @@ input[type="password"], .input-hider {
             Type the same phrase into "Re-enter and Verify".
             <p>Note that <strong>you cannot recover your note if you forget the pass phrase</strong>. Use this field to catch any mistypes.</p>
           </li>
-          <li>Press "Shield" button.</li>
-          <li>Press "Copy Result to Clipboard" button to copy the result in "<span class="emoji-container">🛡</span> Shielded Text" field to the clipboard.</li>
+          <li>Press "<span class="emoji-container">🛡</span> Shield" button.</li>
+          <li>Press "Copy Result to Clipboard" button to copy the result in "<span class="emoji-container">🔒</span> Shielded Text" field to the clipboard.</li>
           <li>Switch to the app to save the result and paste the clipboard.</li>
+          <li>Send the address of this page to your other devices so that you can recover your note on any of them.</li>
         </ol>
       </li>
       <li>
         <p>Recover your note from the shielded text.</p>
+        <p>You can recover your note with any device, whether or not it's where you shielded the original note.</p>
         <ol>
           <li>Copy the shielded text from the app you saved it.</li>
           <li>Ensure "Operation" has "Recover" selected.</li>
-          <li>Paste from the clipboard to "<span class="emoji-container">🛡</span> Shielded Text".</li>
+          <li>Paste from the clipboard to "<span class="emoji-container">🔒</span> Shielded Text".</li>
           <li>Type in "🔑 Pass-Phrase" the phrase that you typed when shielding your note.</li>
           <li>Press "Recover" button.</li>
-          <p>Note that <strong>you cannot recover your note if you forget the pass phrase</strong>.</p>
         </ol>
+        <p>Note that <strong>you cannot recover your note if you forget the pass phrase</strong>.</p>
       </li>
       <li>
         <p>Edit the recovered note and shield it again.</p>
@@ -1365,11 +1497,12 @@ input[type="password"], .input-hider {
     <h3>使い方</h3>
     <ul>
       <li>
-        <p>このページを使う準備をする。</p>
+        <p id="Details-usage-prep-ja">このページを使う準備をする。</p>
         <ol>
           <li>信頼できるパソコンないしはスマホ、OS、ブラウザを準備する。</li>
           <li>OSとブラウザをアップデートして最新にする。</li>
           <li>このページをダウンロードして保存するか、アプリとしてインストールする。</li>
+          <li>シールドしたメモがどこでも復元できるように、ページのアドレスを他のパソコンやスマホに送る。</li>
         </ol>
         <p>
           このページは、それを開くパソコンやスマホ、OS、ブラウザの機能を利用します。
@@ -1410,7 +1543,7 @@ input[type="password"], .input-hider {
       <li>
         <p>メモをシールドする。</p>
         <ol>
-          <li>「操作」で「シールド」が選択されていることを確認する。</li>
+          <li>「操作」で「<span class="emoji-container">🛡</span> シールド」が選択されていることを確認する。</li>
           <li>「<span class="emoji-container">📝</span> メモ」にテキストを入力する。</li>
           <li>
             メモをシールドする合言葉を決めて、「<span class="emoji-container">🔑</span> 合言葉」に入力する。アルファベットの大文字、小文字、記号、数字を混ぜて、十分に長い複雑な合言葉を選ぶ。
@@ -1424,21 +1557,23 @@ input[type="password"], .input-hider {
             同じ合言葉を「もう一度入力して確認」に再度入力する。
             <p>注意：<strong>合言葉を忘れてしまった場合、元のメモを復元することはできません</strong>。この入力欄で、キーボードの打ち間違いが無いか確認します。</p>
           </li>
-          <li>「シールド」ボタンを押す。</li>
-          <li>「結果をクリップボードにコピー」ボタンを押して、「<span class="emoji-container">🛡</span> シールド済みテキスト」に表示されている結果をクリップボードにコピーする。</li>
+          <li>「<span class="emoji-container">🛡</span> シールド」ボタンを押す。</li>
+          <li>「結果をクリップボードにコピー」ボタンを押して、「<span class="emoji-container">🔒</span> シールド済みテキスト」に表示されている結果をクリップボードにコピーする。</li>
           <li>結果を保存したいアプリに移動して、クリップボードの内容を貼り付ける。</li>
+          <li>シールドしたメモがどこでも復元できるように、ページのアドレスを他のパソコンやスマホに送る。</li>
         </ol>
       </li>
       <li>
         <p>シールド済みのテキストからメモを復元する。</p>
+        <p>シールドしたのと同じパソコンやスマホでなくても、メモを復元することができます。</p>
         <ol>
           <li>シールド済みのテキストを、保存したアプリからコピーする。</li>
           <li>「操作」で「復元」が選択されていることを確認する。</li>
-          <li>「<span class="emoji-container">🛡</span> シールド済みテキスト」にクリップボードの内容を貼り付ける。</li>
+          <li>「<span class="emoji-container">🔒</span> シールド済みテキスト」にクリップボードの内容を貼り付ける。</li>
           <li>「<span class="emoji-container">🔑</span> 合言葉」に、元のメモをシールドした時に入力した合言葉を再度入力する。</li>
           <li>「復元」ボタンを押す。</li>
-          <p>注意：<strong>合言葉を忘れてしまった場合、元のメモを復元することはできません</strong>。</p>
         </ol>
+        <p>注意：<strong>合言葉を忘れてしまった場合、元のメモを復元することはできません</strong>。</p>
       </li>
       <li>
         <p>復元したメモを編集して再度シールドする。</p>
