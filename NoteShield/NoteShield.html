@@ -1067,6 +1067,9 @@ textarea {
 .emoji-container {
   font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla, twemoji mozilla, segoe ui symbol;
 }
+.url-container {
+  overflow-wrap: break-word;
+}
 .right-align-container {
   text-align: right;
 }
@@ -1247,7 +1250,7 @@ input[type="password"], .input-hider {
           <p>
             <span class="emoji-container">🔗</span>
             <span data-resource-id="siteUrlLabelLabel" data-resource-target="innerText"></span>
-            <a href="https://yusukebou.github.io/NoteShield/NoteShield.html">https://yusukebou.github.io/NoteShield/NoteShield.html</a>
+            <a class="url-container" href="https://yusukebou.github.io/NoteShield/NoteShield.html">https://yusukebou.github.io/NoteShield/NoteShield.html</a>
           </p>
           <p>
             <button data-resource-id="copySiteUrlButtonLabel" data-resource-target="aria-label" onclick="viewModel.onCopySiteUrlButtonPressed()">
