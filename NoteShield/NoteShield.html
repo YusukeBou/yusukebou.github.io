@@ -13,8 +13,8 @@
 <title data-resource-id="title" data-resource-target="innerText">Note Shield</title>
 <meta property="og:title" content="Note Shield" data-resource-id="title" data-resource-target="content">
 
-<meta name="description" data-resource-id="description" data-resource-target="content" content="This page can shield your note with an encryption pass-phrase or recover it from the shielded text. The note cannot be recovered without your pass-phrase. The page does not send any information about your pass-phrase or note to outside your device." ></<meta>
-<meta name="og:description" data-resource-id="description" data-resource-target="content" content="This page can shield your note with an encryption pass-phrase or recover it from the shielded text. The note cannot be recovered without your pass-phrase. The page does not send any information about your pass-phrase or note to outside your device." ></<meta>
+<meta name="description" data-resource-id="description" data-resource-target="content" content="Note Shield can shield your note with an encryption pass-phrase or recover it from the shielded text. The note cannot be recovered without your pass-phrase. Note Shield does not send any information about your pass-phrase or note to outside your device." ></<meta>
+<meta name="og:description" data-resource-id="description" data-resource-target="content" content="Note Shield can shield your note with an encryption pass-phrase or recover it from the shielded text. The note cannot be recovered without your pass-phrase. Note Shield does not send any information about your pass-phrase or note to outside your device." ></<meta>
 
 <!-- Prevent zooming for now -->
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
@@ -821,7 +821,7 @@ const viewModel = (function() {
     this.initializeShareButton = function() {
       const elements = getPageElements();
       const canShare = !!navigator.share;
-      elements.shareButtonContainer.style.setProperty("display", canShare ? "list-item" : "none");
+      elements.shareButtonContainer.style.setProperty("display", canShare ? "block" : "none");
     };
 
     this.onShareButtonPressed = async function() {
@@ -887,13 +887,13 @@ const resources = {
     title: "Note Shield",
     _comment_title: "Page title as well as the page header.",
 
-    description: "This page can shield your note with an encryption pass-phrase or recover it from the shielded text. The note cannot be recovered without your pass-phrase. The page does not send any information about your pass-phrase or note to outside your device.",
+    description: "Note Shield can shield your note with an encryption pass-phrase or recover it from the shielded text. The note cannot be recovered without your pass-phrase. Note Shield does not send any information about your pass-phrase or note to outside your device.",
     _comment_description: "The sentence to describe what the HTML page provides.",
 
     detailsLinkText: "Details...",
     _comment_detailsLinkText: "Clicking the link scrolls the page to the 'Details' section of the page.",
 
-    languageSelectorLabel: "Page Language:",
+    languageSelectorLabel: "Language:",
     _comment_languageSelectorLabel: "Drop-down box to change the current UI language.",
 
     languageName: "English",
@@ -962,23 +962,29 @@ const resources = {
     copyResultButtonLabel: "Copy Result to Clipboard",
     _comment_copyResultButtonLabel: "Button to copy the decoded text to the clipboard.",
 
-    copySiteUrlButtonLabel: "Copy Page Address to Clipboard",
+    copySiteUrlButtonLabel: "Copy Address to Clipboard",
     _comment_copySiteUrlButtonLabel: "Button to copy the page URL.",
 
     clipboardWriteSuccessMessage: "Copied.",
     _comment_clipboardWriteSuccessMessage: "The user pressed the copy-result or copy-URL button and no error is discovered. Without the message, it looks like the button-press did nothing.",
 
-    clipboardWriteAccessNotAllowedErrorMessage: "The browser does not permit the page to change the clipboard. Click on the result text field and copy there.",
+    clipboardWriteAccessNotAllowedErrorMessage: "The browser does not permit the page to change the clipboard. Select the text and copy there.",
     _comment_clipboardWriteAccessNotAllowedErrorMessage: "The user pressed the copy-result or copy-URL button but the browser returned the permission error while accessing to the clipboard.",
 
-    installLinkText: "Download and Intall the Page as Web App",
+    installLinkText: "Install Note Shield to Use Offline",
     _comment_installLinkText: "Link to the document that describes how to setup this page locally.",
 
-    siteUrlLabelLabel: "Page Address:",
+    siteUrlSharingSectionLabel: "Send Note Shield to Other Devices:",
+    _comment_siteUrlSharingSectionLabel: "",
+
+    siteUrlLabelLabel: "Address:",
     _comment_siteUrlLabelLabel: "Label right before the URL to the page itself.",
 
-    shareButtonLabel: "Send the Page Address",
+    shareButtonLabel: "Send Address",
     _comment_shareButtonLabel: "Button to open Share panel of the browser.",
+
+    qrCodeLabel: "QR Code:",
+    _comment_qrCodeLabel: "Label right before the QR code image for this page URL.",
 
     subtleNotFoundErrorMessage: "Web Crypto library is not found. The browser may be too old or the file could be from HTTP (non-HTTPS) server.",
     _comment_subtleNotFoundErrorMessage: "window.crypto.subtle is not found.",
@@ -992,9 +998,9 @@ const resources = {
 
   "ja": {
     title: "メモ シールド",
-    description: "このページでは、メモを暗号用の合言葉でシールド（保護）して読めないテキストにしたり、それを復元したりできます。合言葉を知らないと、元のメモは復元できません。あなたのパソコンやスマホから外部にメモの内容や合言葉が送られることはありません。",
+    description: "メモ シールドは、メモを暗号用の合言葉でシールド（保護）して読めないテキストにしたり、それを復元したりできます。合言葉を知らないと、元のメモは復元できません。あなたのパソコンやスマホから外部にメモの内容や合言葉が送られることはありません。",
     detailsLinkText: "詳細...",
-    languageSelectorLabel: "ページの言語：",
+    languageSelectorLabel: "言語：",
     languageName: "日本語",
     actionRadioGroupLabel: "操作：",
     encodeRadioLabel: "シールド",
@@ -1017,12 +1023,14 @@ const resources = {
     editPlainTextButtonLabel: "メモを編集",
     afterActionSectionLabelText: "最後に：",
     copyResultButtonLabel: "結果をクリップボードにコピー",
-    copySiteUrlButtonLabel: "このページのアドレスをクリップボードにコピー",
+    copySiteUrlButtonLabel: "アドレスをクリップボードにコピー",
     clipboardWriteSuccessMessage: "コピーされました。",
-    clipboardWriteAccessNotAllowedErrorMessage: "ブラウザが、このページのクリップボードへの操作を拒否しました。結果のテキストをクリックして、そこでコピーしてください。",
-    installLinkText: "ページをダウンロードしてアプリとしてインストール",
-    siteUrlLabelLabel: "ページのアドレス：",
-    shareButtonLabel: "ページのアドレスを送る",
+    clipboardWriteAccessNotAllowedErrorMessage: "ブラウザが、このページのクリップボードへの操作を拒否しました。テキストを選択して、そこでコピーしてください。",
+    installLinkText: "ネットなしでメモ シールドを使えるようにインストール",
+    siteUrlSharingSectionLabel: "メモ シールドを他のパソコンやスマホに送る",
+    siteUrlLabelLabel: "アドレス：",
+    shareButtonLabel: "アドレスを送る",
+    qrCodeLabel: "QR コード：",
     subtleNotFoundErrorMessage: "Web Crypto ライブラリが見つかりません。ブラウザが古すぎるか、ファイルがHTTPSではなくHTTPのサーバーにある可能性があります。",
     getRandomValuesNotFoundErrorMessage: "Web Crypto 乱数関数が見つかりません。ブラウザが古すぎます。",
     unknownErrorMessage: "未知のエラー",
@@ -1101,7 +1109,7 @@ input[type="password"], .input-hider {
 </head>
 <body>
   <p id="javascript-disabled-text" class=".message-area">
-    This page depends on JavaScript. If this message persists, the page could not run the script. Check the browser setting to see whether JavaScript is enabled.
+    Note Shield depends on JavaScript. If this message persists, the page could not run the script. Check the browser setting to see whether JavaScript is enabled.
   </p>
   <script type="text/javascript">
     const javaScriptDisabledTextElement = document.getElementById("javascript-disabled-text");
@@ -1116,8 +1124,8 @@ input[type="password"], .input-hider {
       <span data-resource-id="description" data-resource-target="innerText"></span>
       <a data-resource-id="detailsLinkText" data-resource-target="innerText" onclick="viewModel.onDetailsLinkClick('Details')" href="javascript:"></a>
     </p>
-    <p dir="rtl"><!-- quick hack for right-alignment... fix when adopting to an RTL language -->
-      <span dir="ltr">
+    <p class="right-align-container">
+      <span>
         <label for="language-selector">
           <span class="emoji-container">🌐</span>
           <span data-resource-id="languageSelectorLabel" data-resource-target="innerText"></span>
@@ -1125,7 +1133,7 @@ input[type="password"], .input-hider {
         <select id="language-selector" oninput="viewModel.onLanguageSelectorInput()"></select>
       </span>
     </p>
-    <p style="cursor:default;"><!-- Spaces around the radio inputs may flicker the mouse cursor as the user hovers over around these elements. -->
+    <div style="cursor:default;"><!-- Spaces around the radio inputs may flicker the mouse cursor as the user hovers over around these elements. -->
       <div><label><span data-resource-id="actionRadioGroupLabel" data-resource-target="innerText"></span></label></div>
       <div>
         <input type="radio" id="encode-radio" name="conversion-direction" value="encode" data-resource-id="encodeRadioLabel" data-resource-target="aria-label" onchange="viewModel.onEncodeDecodeRadioChanged()"/>
@@ -1141,7 +1149,7 @@ input[type="password"], .input-hider {
           <span data-resource-id="decodeRadioLabel" data-resource-target="innerText"></span>
         </label>
       </div>
-    </p>
+    </div>
     <div id="encoding-container">
       <p>
         <div><label for="plain">
@@ -1247,6 +1255,7 @@ input[type="password"], .input-hider {
           </p>
         </li>
         <li>
+          <p data-resource-id="siteUrlSharingSectionLabel" data-resource-target="innerText"></p>
           <p>
             <span class="emoji-container">🔗</span>
             <span data-resource-id="siteUrlLabelLabel" data-resource-target="innerText"></span>
@@ -1255,22 +1264,22 @@ input[type="password"], .input-hider {
           <p>
             <button data-resource-id="copySiteUrlButtonLabel" data-resource-target="aria-label" onclick="viewModel.onCopySiteUrlButtonPressed()">
               <span class="emoji-container">📋</span>
-              <span data-resource-id="copySiteUrlButtonLabel" data-resource-target="innerText" ></span>
+              <span data-resource-id="copySiteUrlButtonLabel" data-resource-target="innerText"></span>
             </button>
             <span id="copy-url-result-message"></span>
           </p>
-        </li>
-        <li id="share-button-container" style="display:none;">
-          <p>
+          <p id="share-button-container" style="display:none;">
             <button data-resource-id="shareButtonLabel" data-resource-target="aria-label" onclick="viewModel.onShareButtonPressed()">
               <span class="emoji-container">📤</span>
               <span data-resource-id="shareButtonLabel" data-resource-target="innerText" ></span>
             </button>
             <span id="share-result-message" class="message-area"></span>
           </p>
+          <div data-resource-id="qrCodeLabel" data-resource-target="innerText" ></div><!-- The actual image is out of this list item so that it centerizes without indent. -->
         </li>
       </ul>
     </p>
+    <div style="text-align:center;"><img src="NoteShield.qr.png" width="200" height="200"></img></div>
     <div style="display:none;">
       <input id="phrase-input" type="password" autocomplete="off" oninput="viewModel.onPhraseInput()"/>
     </div>
@@ -1303,7 +1312,7 @@ input[type="password"], .input-hider {
       </li>
       <li>
         <p>Available forever</p>
-        <p>No dependency on any service or web sites. PC or smart phone, its operating system, a browser, and this page is all you need.</p>
+        <p>No dependency on any service or web sites. PC or smart phone, its operating system, a browser, and Note Shield is all you need.</p>
       </li>
       <li>
         <p>Pass-phrase strength check</p>
@@ -1317,8 +1326,8 @@ input[type="password"], .input-hider {
       <li>
         <p>100% open-source; anyone can verify</p>
         <p>
-          All the encryption implementation is within this page and
-          <a href="https://github.com/YusukeBou/yusukebou.github.io/tree/main/NoteShield" target="_blank">all the pages are published</a>, even including icons.
+          All the encryption implementation is within Note Shield and
+          <a href="https://github.com/YusukeBou/yusukebou.github.io/tree/main/NoteShield" target="_blank">all the files are published</a>, even including icons.
           Anyone with HTML and JavaScript knowledge can verify the page correctness. Moreover, <a href="#Test">dozens of test cases are automated</a> to require no engineer.
         </p>
       </li>
@@ -1326,33 +1335,44 @@ input[type="password"], .input-hider {
     <h3>Usage</h3>
     <ul>
       <li>
-        <p id="Details-usage-prep-en">Prepare to use this page.</p>
+        <p id="Details-usage-prep-en">Prepare to use Note Shield.</p>
         <ol>
           <li>Get a PC or smart phone, OS, and a browser that you can trust.</li>
           <li>Update OS and the browser to the latest.</li>
-          <li>Download and save this page or install this page as an app.</li>
-          <li>Send the address of this page to your other devices so that you can recover your note on any of them.</li>
+          <li>Download and save Note Shield page or install Note Shield as an app.</li>
+          <li>Send the address of Note Shield to your other devices so that you can recover your note on any of them.</li>
         </ol>
         <p>
-          This page depends on PC or smart phone, OS, and the browser.
-          If these would leak your information or would not honor your privacy, then your information is not secure even if this page does not send any information to outside by itself.
+          Note Shield depends on PC or smart phone, OS, and the browser.
+          If these would leak your information or would not honor your privacy, then your information is not secure even if Note Shield does not send any information to outside by itself.
         </p>
         <p>
-          To be prepared for the case the network would become unavailable or the page would be deleted from the Internet, save this page to your PC or install the page as an app.
+          To be prepared for the case the network would become unavailable or unstable, download Note Shield page to your PC or install Note Shield as an app.
         </p>
         <ul>
           <li>
             <p>Windows PC</p>
             <ol>
-              <li><a href="microsoft-edge:https://yusukebou.github.io/NoteShield/NoteShield.html">Open this page with Microsoft Edge</a> after updating it to the latest.</li>
-              <li>Open menu from … button at around right-top corner and select "Apps" and "Install this site as an app".</li>
+              <li><a href="microsoft-edge:https://yusukebou.github.io/NoteShield/NoteShield.html">Open Note Shield with Microsoft Edge</a> after updating it to the latest.</li>
+              <li>
+                <p>
+                  Click a plus button that looks like
+                  <span style="border-width: 1px;border-style: solid;border-radius: 999px;font-weight: bold;border-color: gray;color: gray;">&nbsp;+&nbsp;</span>
+                  around the end of the address bar.
+                </p>
+                <p>
+                  (If you do not find the button, open menu from
+                  <span style="font-weight: bold;vertical-align: super;">…</span>
+                  button at around right-top corner and select "Apps" and "Install this site as an app".)
+                </p>
+              </li>
               <li>Click "Install" button to get "Note Shield" app opened instead of a web page. The app is also added to Start menu.</li>
             </ol>
           </li>
           <li>
             <p>iPhone / iPad</p>
             <ol>
-              <li>Open this page with the latest Safari browser.</li>
+              <li>Open Note Shield with the latest Safari browser.</li>
               <li>Tap on Share button (box with up-arrow) at the bottom center of the browser.</li>
               <li>Tap "Add to Home Screen".</li>
               <li>Tap "Add" button to get "Note Shield" app icon on your home screen.</li>
@@ -1361,7 +1381,7 @@ input[type="password"], .input-hider {
           <li>
             <p>Android</p>
             <ol>
-              <li>Open this page with the latest Chrome browser.</li>
+              <li>Open Note Shield with the latest Chrome browser.</li>
               <li>Open menu from ： button at around right-top corner and select "Add to home screen".</li>
               <li>Click "Install" button to add "Note Shield" app to the phone.</li>
             </ol>
@@ -1389,7 +1409,7 @@ input[type="password"], .input-hider {
           <li>Press "<span class="emoji-container">🛡</span> Shield" button.</li>
           <li>Press "Copy Result to Clipboard" button to copy the result in "<span class="emoji-container">🔒</span> Shielded Text" field to the clipboard.</li>
           <li>Switch to the app to save the result and paste the clipboard.</li>
-          <li>Send the address of this page to your other devices so that you can recover your note on any of them.</li>
+          <li>Send the address of Note Shield to your other devices so that you can recover your note on any of them.</li>
         </ol>
       </li>
       <li>
@@ -1408,7 +1428,7 @@ input[type="password"], .input-hider {
         <p>Edit the recovered note and shield it again.</p>
         <ol>
           <li>Follow the above "Recover your note from the shielded text" steps.</li>
-          <li>Press "Edit Note" button to switch the page for "Shielde" operation.</li>
+          <li>Press "Edit Note" button to switch Note Shield for "Shielde" operation.</li>
           <li>Edit in "<span class="emoji-container">📝</span> Note" field.</li>
           <li>Follow the above "Shield your note" steps.</li>
         </ol>
@@ -1421,13 +1441,13 @@ input[type="password"], .input-hider {
         <p>The most basic method to break the encryption is to try all the possible passwords one by one. Because simpler phrases may come earlier during the trials, their shielded texts are recovered earlier by others.</p>
       </li>
       <li>
-        <p>Can I use this page to give my note safely to my friends?</p>
-        <p>This page does not provide any method to share the pass-phrase safely. In case the phrase is known to a third party, at worst, your original note could become available to anyone.</p>
+        <p>Can I use Note Shield to give my note safely to my friends?</p>
+        <p>Note Shield does not provide any method to share the pass-phrase safely. In case the phrase is known to a third party, at worst, your original note could become available to anyone.</p>
       </li>
       <li>
-        <p>Does this page work with my browser?</p>
+        <p>Does Note Shield work with my browser?</p>
         <p>
-          <p>As of January 2021, the following browsers are tested with this page.</p>
+          <p>As of January 2021, the following browsers are tested with Note Shield.</p>
           <ul>
             <li>Mozilla Firefox Version 84.0.1 (64-bit) for Windows</li>
             <li>Google Chrome Version 87.0.4280.88 (64-bit) for Windows</li>
@@ -1467,7 +1487,7 @@ input[type="password"], .input-hider {
       <li>
         <p>重要な情報をより安全に保存</p>
         <p>
-          他人には知られたくない、知られては困る情報でも、覚えられないものは多くあります。そんな情報をどこかに保存する時、このページでシールドすれば、そのまま保存するより安全に保存することができます。
+          他人には知られたくない、知られては困る情報でも、覚えられないものは多くあります。そんな情報をどこかに保存する時、メモ シールドでシールドすれば、そのまま保存するより安全に保存することができます。
           ファイル共有サービスを使ったり、自分自身へメールやで送信したりすれば、複数のパソコンやスマホで情報を見ることができます。
         </p>
       </li>
@@ -1484,7 +1504,7 @@ input[type="password"], .input-hider {
       </li>
       <li>
         <p>半永久的</p>
-        <p>他のサービスや Web サイトへの依存は全くありません。パソコンないしはスマホ、OS、ブラウザ、このページさえあれば、他には何も必要ありません。</p>
+        <p>他のサービスや Web サイトへの依存は全くありません。パソコンないしはスマホ、OS、ブラウザ、メモ シールドさえあれば、他には何も必要ありません。</p>
       </li>
       <li>
         <p>合言葉強度判定</p>
@@ -1503,34 +1523,42 @@ input[type="password"], .input-hider {
     <h3>使い方</h3>
     <ul>
       <li>
-        <p id="Details-usage-prep-ja">このページを使う準備をする。</p>
+        <p id="Details-usage-prep-ja">メモ シールドを使う準備をする。</p>
         <ol>
           <li>信頼できるパソコンないしはスマホ、OS、ブラウザを準備する。</li>
           <li>OSとブラウザをアップデートして最新にする。</li>
-          <li>このページをダウンロードして保存するか、アプリとしてインストールする。</li>
-          <li>シールドしたメモがどこでも復元できるように、ページのアドレスを他のパソコンやスマホに送る。</li>
+          <li>メモ シールドをダウンロードして保存するか、アプリとしてインストールする。</li>
+          <li>シールドしたメモがどこでも復元できるように、メモ シールドのアドレスを他のパソコンやスマホに送る。</li>
         </ol>
         <p>
-          このページは、それを開くパソコンやスマホ、OS、ブラウザの機能を利用します。
-          これらがあなたの情報を漏らしてしまったり、あなたのプライバシーを尊重してくれない場合、このページが情報を外部に送信しなくても、あなたの情報は守れません。
+          メモ シールドは、それを開くパソコンやスマホ、OS、ブラウザの機能を利用します。
+          これらがあなたの情報を漏らしてしまったり、あなたのプライバシーを尊重してくれない場合、メモ シールドが情報を外部に送信しなくても、あなたの情報は守れません。
         </p>
         <p>
-          ネットにアクセスできない場合や、万が一このページがネットから無くなった時に備えて、このページをパソコンにダウンロードしておくと安心です。
-          あるいは、以下の手順で、パソコンやスマホにこのページをアプリとしてインストールしておくこともできます。
+          ネットにアクセスできない場合や不安定な時に備えて、メモ シールドのページをパソコンにダウンロードしておくと安心です。
+          あるいは、以下の手順で、パソコンやスマホにメモ シールドをアプリとしてインストールしておくこともできます。
         </p>
         <ul>
           <li>
             <p>Windows PC の場合</p>
             <ol>
-              <li>最新の <a href="microsoft-edge:https://yusukebou.github.io/NoteShield/NoteShield.html">Microsoft Edge でこのページを開く</a>。</li>
-              <li>右上の … ボタンを押してメニューを開き、「アプリ」から、「このサイトをアプリとしてインストール」を選択。</li>
+              <li>最新の <a href="microsoft-edge:https://yusukebou.github.io/NoteShield/NoteShield.html">Microsoft Edge でメモ シールドを開く</a>。</li>
+              <li>
+                <p>
+                  アドレスバーの終わりにある、
+                  <span style="border-width: 1px;border-style: solid;border-radius: 999px;font-weight: bold;border-color: gray;color: gray;">&nbsp;+&nbsp;</span>
+                  のように見えるプラスボタンをクリック。
+                </p>
+                <p>（ボタンが見つからない場合、右上の … ボタンを押してメニューを開き、「アプリ」から、「このサイトをアプリとしてインストール」を選択。）</p>
+              </li>
+
               <li>「インストール」ボタンをクリックすると、サイトがアプリとして開き、スタートメニューにも「メモ シールド」アプリとして登録されます。</li>
             </ol>
           </li>
           <li>
             <p>iPhone / iPad の場合</p>
             <ol>
-              <li>このページを最新の Safari で開く。</li>
+              <li>メモ シールドを最新の Safari で開く。</li>
               <li>画面下端中央の共有ボタン（四角と上矢印の組み合わせ）をタップ。</li>
               <li>「ホーム画面に追加」をタップ。</li>
               <li>「追加」ボタンをタップすると、「メモ シールド」アプリがホーム画面に追加されます。</li>
@@ -1539,7 +1567,7 @@ input[type="password"], .input-hider {
           <li>
             <p>Android の場合</p>
             <ol>
-              <li>このページを最新の Chrome で開く。</li>
+              <li>メモ シールドを最新の Chrome で開く。</li>
               <li>右上の：ボタンを押してメニューを開き、「アプリをインストール」を選択。</li>
               <li>「インストール」ボタンをクリックすると、「メモ シールド」アプリがスマホに追加されます。</li>
             </ol>
@@ -1566,7 +1594,7 @@ input[type="password"], .input-hider {
           <li>「<span class="emoji-container">🛡</span> シールド」ボタンを押す。</li>
           <li>「結果をクリップボードにコピー」ボタンを押して、「<span class="emoji-container">🔒</span> シールド済みテキスト」に表示されている結果をクリップボードにコピーする。</li>
           <li>結果を保存したいアプリに移動して、クリップボードの内容を貼り付ける。</li>
-          <li>シールドしたメモがどこでも復元できるように、ページのアドレスを他のパソコンやスマホに送る。</li>
+          <li>シールドしたメモがどこでも復元できるように、メモ シールドのアドレスを他のパソコンやスマホに送る。</li>
         </ol>
       </li>
       <li>
@@ -1585,7 +1613,7 @@ input[type="password"], .input-hider {
         <p>復元したメモを編集して再度シールドする。</p>
         <ol>
           <li>上の「シールド済みのテキストからメモを復元する」手順に従って、メモを復元する。</li>
-          <li>「メモを編集」ボタンを押す。ページが「シールド」操作に切り替わる。</li>
+          <li>「メモを編集」ボタンを押す。メモ シールドが「シールド」操作に切り替わる。</li>
           <li>「<span class="emoji-container">📝</span> メモ」の内容を編集する。</li>
           <li>上の「メモをシールドする」手順に従って、メモを再度シールドする。</li>
         </ol>
@@ -1598,11 +1626,11 @@ input[type="password"], .input-hider {
         <p>暗号を破る最も基本的な方法は、可能な全てのパスワードを順番に試していくことです。簡単な合言葉は、「順番」の初めの方で現れてしまいます。その結果、簡単な合言葉を使ってシールドした結果は、より早く他人に復元されてしまいます。</p>
       </li>
       <li>
-        <p>知人に安全に情報を渡すために、このページは利用できますか。</p>
-        <p>このページは、合言葉を安全に他の人に知らせる方法は提供していません。もしも合言葉が第3者に漏れた場合、最悪の場合、元のメモの内容を誰でも知ることができるようになる可能性があります。</p>
+        <p>知人に安全に情報を渡すために、メモ シールドは利用できますか。</p>
+        <p>メモ シールドは、合言葉を安全に他の人に知らせる方法は提供していません。もしも合言葉が第3者に漏れた場合、最悪の場合、元のメモの内容を誰でも知ることができるようになる可能性があります。</p>
       </li>
       <li>
-        <p>私のブラウザでこのページは動作しますか。</p>
+        <p>私のブラウザでメモ シールドは動作しますか。</p>
         <p>
           <p>2021年1月時点でテスト済みのブラウザ、以下の通りです。</p>
           <ul>
